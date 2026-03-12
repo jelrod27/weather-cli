@@ -1,0 +1,33 @@
+name: Enforce Linear History
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  check-linear-history:
+    runs-on: ubuntu-latest
+    name: Check for Merge Commits
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for Merge Commits
+        run: |
+          echo "Checking for merge commits in PR..."
+          ALLOWED_COMMITS=$(git rev-list --count --no-merges ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }})
+          TOTAL_COMMITS=$(git rev-list --count ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }})
+          
+          echo "Total commits: $TOTAL_COMMITS"
+          echo "Non-merge commits: $ALLOWED_COMMITS"
+          
+          if [ "$ALLOWED_COMMITS" -ne "$TOTAL_COMMITS" ]; then
+            MERGE_COUNT=$((TOTAL_COMMITS - ALLOWED_COMMITS))
+            echo "❌ ERROR: $MERGE_COUNT merge commit(s) detected."
+            echo "Please rebase your branch: git pull --rebase origin main"
+            exit 1
+          fi
+          
+          echo "✅ Linear history verified. No merge commits found."

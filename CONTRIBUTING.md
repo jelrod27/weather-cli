@@ -93,13 +93,26 @@ We welcome feature suggestions! Please:
    git commit -m "Add feature: description of your changes"
    ```
 
-5. **Push to your fork**:
+5. **Rebase on latest main** (Linear History Required):
+
+   ```bash
+   # Fetch latest changes
+   git fetch origin
+
+   # Rebase your branch onto main
+   git rebase origin/main
+
+   # If conflicts occur, resolve them and continue
+   git rebase --continue
+   ```
+
+6. **Push to your fork**:
 
    ```bash
    git push origin feature/your-feature-name
    ```
 
-6. **Create a Pull Request** on GitHub:
+7. **Create a Pull Request** on GitHub:
    - Use a clear title and description
    - Reference any related issues
    - Include screenshots for UI changes
