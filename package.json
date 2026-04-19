@@ -1,6 +1,6 @@
 {
   "name": "weather-cli-16bit",
-  "version": "0.3.62",
+  "version": "0.3.64",
   "description": "A simple, intelligent weather CLI with smart location detection - no quotes needed",
   "main": "index.js",
   "type": "module",
