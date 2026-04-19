@@ -2,18 +2,7 @@ import chalk from 'chalk';
 import boxen from 'boxen';
 import { getScene, isDaytime } from './ascii/index.js';
 import { AsciiRenderer } from './ascii/renderer.js';
-
-const weatherEmojis = {
-  Clear: '☀️',
-  Clouds: '☁️',
-  Rain: '🌧️',
-  Drizzle: '🌦️',
-  Thunderstorm: '⛈️',
-  Snow: '❄️',
-  Mist: '🌫️',
-  Fog: '🌫️',
-  Haze: '🌫️'
-};
+import { weatherEmojis } from './utils/icons.js';
 
 function formatTemp(temp, displayUnit, options = {}) {
   const unit = displayUnit === 'fahrenheit' ? '°F' : '°C';

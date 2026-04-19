@@ -32,6 +32,7 @@ import {
 import { WeatherError, mapErrorToExitCode } from './src/utils/errors.js';
 import { setApiKey, testApiKey } from './src/api/auth.js';
 import { parseLocation } from './src/utils/locationParser.js';
+import { runStatus } from './src/commands/status.js';
 
 dotenv.config({ quiet: true });
 
@@ -77,19 +78,22 @@ async function resolveLocation(provided) {
   throw new WeatherError('No location provided', 'INVALID_INPUT');
 }
 
+async function fetchWithCache(location, userUnits, { fetcher = getWeather } = {}) {
+  const cacheKey = userUnits || 'auto';
+  const cached = await getCachedWeather(location, cacheKey);
+  if (cached) {
+    console.log(chalk.gray('📦 Using cached data...'));
+    return cached;
+  }
+  const data = await fetcher(location, userUnits);
+  await setCachedWeather(location, cacheKey, data);
+  return data;
+}
+
 async function showCurrentWeather(location, options, { forecast = false } = {}) {
   const userUnits = processTemperatureOptions(options);
   const artOpts = await buildArtOptions(options);
-  const cacheKey = userUnits || 'auto';
-
-  let data = await getCachedWeather(location, cacheKey);
-  if (data) {
-    console.log(chalk.gray('📦 Using cached data...'));
-  } else {
-    data = await getWeather(location, userUnits);
-    await setCachedWeather(location, cacheKey, data);
-  }
-
+  const data = await fetchWithCache(location, userUnits);
   displayCurrentWeather(data, data.displayUnit, artOpts);
   if (forecast && !artOpts.artOnly) {
     display24HourForecast(data, data.displayUnit);
@@ -235,7 +239,7 @@ withArtOptions(
   const loc = await resolveLocation(location);
   const userUnits = processTemperatureOptions(options);
   const artOpts = await buildArtOptions(options);
-  const data = await getWeather(loc, userUnits);
+  const data = await fetchWithCache(loc, userUnits);
   displayCurrentWeather(data, data.displayUnit, artOpts);
   display24HourForecast(data, data.displayUnit);
 });
@@ -248,7 +252,7 @@ withArtOptions(
   const loc = await resolveLocation(location);
   const userUnits = processTemperatureOptions(options);
   const artOpts = await buildArtOptions(options);
-  const data = await getWeather(loc, userUnits);
+  const data = await fetchWithCache(loc, userUnits);
   displayCurrentWeather(data, data.displayUnit, artOpts);
   display5DayForecast(data, data.displayUnit);
 });
@@ -269,7 +273,9 @@ withArtOptions(
   const [lat, lon] = coordinates.split(',').map((c) => c.trim());
   const userUnits = processTemperatureOptions(options);
   const artOpts = await buildArtOptions(options);
-  const data = await getWeatherByCoords(lat, lon, userUnits);
+  const data = await fetchWithCache(`${lat},${lon}`, userUnits, {
+    fetcher: (_loc, units) => getWeatherByCoords(lat, lon, units)
+  });
   displayCurrentWeather(data, data.displayUnit, artOpts);
 });
 
@@ -365,6 +371,17 @@ program
       console.log(chalk.yellow(`  Expired entries: ${stats.expired}`));
     }
   });
+
+withUnitOptions(
+  program
+    .command('status [location...]')
+    .description('One-line weather output for shell prompts / tmux status bars (reads cache only)')
+    .option('--format <preset>', 'Output preset: default, compact, minimal', 'default')
+    .option('--no-emoji', 'Omit the weather icon')
+    .option('--refresh', 'Fetch fresh data if cache is empty or stale')
+).action(async (locationWords, options) => {
+  await runStatus(locationWords, options, { getDefaultLocation, processTemperatureOptions });
+});
 
 program
   .command('interactive')
