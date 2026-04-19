@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { program } from 'commander';
+import { program, Command } from 'commander';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
 import dotenv from 'dotenv';
@@ -8,7 +8,6 @@ import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
-// Import our modules
 import { getWeather, getWeatherByCoords } from './src/weather.js';
 import {
   getCachedWeather,
@@ -20,8 +19,7 @@ import {
 import {
   displayCurrentWeather,
   display5DayForecast,
-  display24HourForecast,
-  displayWeatherBanner
+  display24HourForecast
 } from './src/display.js';
 import {
   processTemperatureOptions,
@@ -35,39 +33,31 @@ import { WeatherError, mapErrorToExitCode } from './src/utils/errors.js';
 import { setApiKey, testApiKey } from './src/api/auth.js';
 import { parseLocation } from './src/utils/locationParser.js';
 
-// Load environment variables
-dotenv.config();
+dotenv.config({ quiet: true });
 
-// Get package version
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+const __dirname = dirname(fileURLToPath(import.meta.url));
 const packageJson = JSON.parse(readFileSync(join(__dirname, 'package.json'), 'utf8'));
 const VERSION = packageJson.version;
 
-// Beta banner function - now opt-in only
-function showBetaBanner() {
-  if (!process.argv.includes('--beta-banner') && !program.opts().betaBanner) return;
-
-  console.log(
-    chalk.yellow.bold(`
-╔══════════════════════════════════════╗
-║              BETA SOFTWARE           ║
-║                                      ║
-║    Weather CLI v${VERSION}               ║
-║    Under active development          ║
-║                                      ║
-║    Feedback & bugs welcome at:       ║
-║    github.com/deephouse23/weather-cli║
-╚══════════════════════════════════════╝
-`)
-  );
+function withUnitOptions(cmd) {
+  return cmd
+    .option('-u, --units <type>', 'Temperature units (metric/imperial/celsius/fahrenheit)', 'auto')
+    .option('--celsius', 'Force Celsius temperature display')
+    .option('--fahrenheit', 'Force Fahrenheit temperature display');
 }
 
-// Build art display options from CLI flags and config
+function withArtOptions(cmd) {
+  return cmd
+    .option('--art', 'Display ASCII art weather scene')
+    .option('--no-art', 'Disable ASCII art')
+    .option('--art-only', 'Display only the ASCII art scene')
+    .option('--art-style <style>', 'Art color style: default, retro')
+    .option('--animate', 'Animate the ASCII art scene');
+}
+
 async function buildArtOptions(options) {
   const config = await getAsciiConfig();
   const artOnly = options.artOnly || false;
-  // artOnly and --art-style both imply art: user explicitly requesting art/ style
   const artEnabled =
     artOnly || options.artStyle ? true : options.art !== undefined ? options.art : config.enabled;
   return {
@@ -78,8 +68,37 @@ async function buildArtOptions(options) {
   };
 }
 
-// Compare weather between two cities
-async function compareWeather(city1, city2, userUnits = null) {
+async function resolveLocation(provided) {
+  if (provided) return provided;
+  const defaultLocation = await getDefaultLocation();
+  if (defaultLocation) return defaultLocation;
+  console.error(chalk.red('❌ No location provided and no default set'));
+  console.log(chalk.yellow('Examples: weather CA, weather San Ramon CA, weather London'));
+  throw new WeatherError('No location provided', 'INVALID_INPUT');
+}
+
+async function showCurrentWeather(location, options, { forecast = false } = {}) {
+  const userUnits = processTemperatureOptions(options);
+  const artOpts = await buildArtOptions(options);
+  const cacheKey = userUnits || 'auto';
+
+  let data = await getCachedWeather(location, cacheKey);
+  if (data) {
+    console.log(chalk.gray('📦 Using cached data...'));
+  } else {
+    data = await getWeather(location, userUnits);
+    await setCachedWeather(location, cacheKey, data);
+  }
+
+  displayCurrentWeather(data, data.displayUnit, artOpts);
+  if (forecast && !artOpts.artOnly) {
+    display24HourForecast(data, data.displayUnit);
+  }
+  return data;
+}
+
+async function compareWeather(city1, city2, options) {
+  const userUnits = processTemperatureOptions(options);
   console.log(chalk.cyan.bold(`\n🌍 Comparing weather: ${city1} vs ${city2}`));
 
   const [data1, data2] = await Promise.all([
@@ -89,21 +108,15 @@ async function compareWeather(city1, city2, userUnits = null) {
 
   console.log(chalk.green('\n📍 City 1:'));
   displayCurrentWeather(data1, data1.displayUnit);
-
   console.log(chalk.green('\n📍 City 2:'));
   displayCurrentWeather(data2, data2.displayUnit);
 
-  // Compare temperatures
   const temp1 = data1.current.main.temp;
   const temp2 = data2.current.main.temp;
   const diff = Math.abs(temp1 - temp2);
+  const unit = data1.displayUnit === 'fahrenheit' ? 'F' : 'C';
 
-  console.log(
-    chalk.yellow(
-      `\n🌡️  Temperature difference: ${diff.toFixed(1)}°${data1.displayUnit === 'fahrenheit' ? 'F' : 'C'}`
-    )
-  );
-
+  console.log(chalk.yellow(`\n🌡️  Temperature difference: ${diff.toFixed(1)}°${unit}`));
   if (temp1 > temp2) {
     console.log(chalk.red(`${city1} is warmer by ${diff.toFixed(1)}°`));
   } else if (temp2 > temp1) {
@@ -113,10 +126,7 @@ async function compareWeather(city1, city2, userUnits = null) {
   }
 }
 
-// Interactive mode
 async function interactiveMode() {
-  displayWeatherBanner();
-
   const defaultLocation = await getDefaultLocation();
   const defaultUnits = await getDefaultUnits();
 
@@ -152,27 +162,18 @@ async function interactiveMode() {
   ]);
 
   const data = await getWeather(answers.location, answers.units);
-
   displayCurrentWeather(data, data.displayUnit);
 
   if (answers.forecast === '24h' || answers.forecast === 'all') {
     display24HourForecast(data, data.displayUnit);
   }
-
   if (answers.forecast === '5day' || answers.forecast === 'all') {
     display5DayForecast(data, data.displayUnit);
   }
 
-  // Save as default if user wants
   const saveDefault = await inquirer.prompt([
-    {
-      type: 'confirm',
-      name: 'save',
-      message: 'Save as default location?',
-      default: false
-    }
+    { type: 'confirm', name: 'save', message: 'Save as default location?', default: false }
   ]);
-
   if (saveDefault.save) {
     await setDefaultLocation(answers.location);
     await setDefaultUnits(answers.units);
@@ -180,12 +181,9 @@ async function interactiveMode() {
   }
 }
 
-// Error handler wrapper
 function handleError(error) {
   if (error instanceof WeatherError) {
     console.error(chalk.red(`❌ ${error.message}`));
-
-    // Add helpful hints for specific errors
     if (error.code === 'API_KEY_MISSING') {
       console.log(chalk.yellow('Get your free API key at: https://openweathermap.org/api'));
       console.log(chalk.yellow('Then run: weather auth set'));
@@ -195,136 +193,85 @@ function handleError(error) {
   } else {
     console.error(chalk.red(`❌ Unexpected error: ${error.message}`));
   }
-
   process.exit(mapErrorToExitCode(error));
 }
 
-// CLI Setup
-program
-  .name('weather')
-  .description('A beautiful CLI weather application')
-  .version(VERSION)
-  .option('--beta-banner', 'Show the beta software banner');
+program.name('weather').description('A beautiful CLI weather application').version(VERSION);
 
-program
-  .command('now [location]')
-  .description('Get current weather for a location (format: "City, State" or "City, Country")')
-  .option('-u, --units <type>', 'Temperature units (metric/imperial/celsius/fahrenheit)', 'auto')
-  .option('--celsius', 'Force Celsius temperature display')
-  .option('--fahrenheit', 'Force Fahrenheit temperature display')
-  .option('--art', 'Display ASCII art weather scene')
-  .option('--no-art', 'Disable ASCII art')
-  .option('--art-only', 'Display only the ASCII art scene')
-  .option('--art-style <style>', 'Art color style: default, retro')
-  .option('--animate', 'Animate the ASCII art scene')
-  .action(async (location, options) => {
-    if (!location) {
-      const defaultLocation = await getDefaultLocation();
-      if (!defaultLocation) {
-        console.error(chalk.red('❌ No location provided and no default set'));
-        console.log(chalk.yellow('Usage: weather "City, State" or weather "City, Country"'));
-        console.log(chalk.yellow('Examples: weather "San Ramon, CA" or weather "London, UK"'));
-        throw new WeatherError('No location provided', 'INVALID_INPUT');
-      }
-      location = defaultLocation;
-    }
+withArtOptions(
+  withUnitOptions(
+    program
+      .argument('[location...]', 'Location words (e.g. "San Ramon CA" or "London")')
+      .option('-f, --forecast', 'Include 24-hour forecast')
+  )
+).action(async (locationWords, options) => {
+  if (!locationWords || locationWords.length === 0) {
+    await interactiveMode();
+    return;
+  }
+  const location = parseLocation(locationWords);
+  if (!location) {
+    console.error(chalk.red('❌ Please specify a location'));
+    console.log(chalk.yellow('Examples: weather CA, weather San Ramon CA, weather London'));
+    process.exit(1);
+  }
+  await showCurrentWeather(location, options, { forecast: options.forecast });
+});
 
-    const userUnits = processTemperatureOptions(options);
-    const artOpts = await buildArtOptions(options);
+withArtOptions(
+  withUnitOptions(
+    program.command('now [location]').description('Get current weather for a location')
+  )
+).action(async (location, options) => {
+  const loc = await resolveLocation(location);
+  await showCurrentWeather(loc, options);
+});
 
-    // Check cache first
-    const cacheKey = userUnits || 'auto';
-    const cached = await getCachedWeather(location, cacheKey);
-    if (cached) {
-      console.log(chalk.gray('📦 Using cached data...'));
-      displayCurrentWeather(cached, cached.displayUnit, artOpts);
-      return;
-    }
+withArtOptions(
+  withUnitOptions(
+    program.command('forecast [location]').description('Get 24-hour forecast for a location')
+  )
+).action(async (location, options) => {
+  const loc = await resolveLocation(location);
+  const userUnits = processTemperatureOptions(options);
+  const artOpts = await buildArtOptions(options);
+  const data = await getWeather(loc, userUnits);
+  displayCurrentWeather(data, data.displayUnit, artOpts);
+  display24HourForecast(data, data.displayUnit);
+});
 
-    const data = await getWeather(location, userUnits);
-    await setCachedWeather(location, cacheKey, data);
-    displayCurrentWeather(data, data.displayUnit, artOpts);
-  });
+withArtOptions(
+  withUnitOptions(
+    program.command('5day [location]').description('Get 5-day forecast for a location')
+  )
+).action(async (location, options) => {
+  const loc = await resolveLocation(location);
+  const userUnits = processTemperatureOptions(options);
+  const artOpts = await buildArtOptions(options);
+  const data = await getWeather(loc, userUnits);
+  displayCurrentWeather(data, data.displayUnit, artOpts);
+  display5DayForecast(data, data.displayUnit);
+});
 
-program
-  .command('forecast [location]')
-  .description('Get 24-hour forecast for a location')
-  .option('-u, --units <type>', 'Temperature units (metric/imperial/celsius/fahrenheit)', 'auto')
-  .option('--celsius', 'Force Celsius temperature display')
-  .option('--fahrenheit', 'Force Fahrenheit temperature display')
-  .option('--art', 'Display ASCII art weather scene')
-  .option('--no-art', 'Disable ASCII art')
-  .option('--art-style <style>', 'Art color style: default, retro')
-  .action(async (location, options) => {
-    if (!location) {
-      const defaultLocation = await getDefaultLocation();
-      if (!defaultLocation) {
-        console.error(chalk.red('❌ No location provided and no default set'));
-        throw new WeatherError('No location provided', 'INVALID_INPUT');
-      }
-      location = defaultLocation;
-    }
+withUnitOptions(
+  program.command('compare <city1> <city2>').description('Compare weather between two cities')
+).action(async (city1, city2, options) => {
+  await compareWeather(city1, city2, options);
+});
 
-    const userUnits = processTemperatureOptions(options);
-    const artOpts = await buildArtOptions(options);
-    const data = await getWeather(location, userUnits);
-    displayCurrentWeather(data, data.displayUnit, artOpts);
-    display24HourForecast(data, data.displayUnit);
-  });
-
-program
-  .command('5day [location]')
-  .description('Get 5-day forecast for a location')
-  .option('-u, --units <type>', 'Temperature units (metric/imperial/celsius/fahrenheit)', 'auto')
-  .option('--celsius', 'Force Celsius temperature display')
-  .option('--fahrenheit', 'Force Fahrenheit temperature display')
-  .option('--art', 'Display ASCII art weather scene')
-  .option('--no-art', 'Disable ASCII art')
-  .option('--art-style <style>', 'Art color style: default, retro')
-  .action(async (location, options) => {
-    if (!location) {
-      const defaultLocation = await getDefaultLocation();
-      if (!defaultLocation) {
-        console.error(chalk.red('❌ No location provided and no default set'));
-        throw new WeatherError('No location provided', 'INVALID_INPUT');
-      }
-      location = defaultLocation;
-    }
-
-    const userUnits = processTemperatureOptions(options);
-    const artOpts = await buildArtOptions(options);
-    const data = await getWeather(location, userUnits);
-    displayCurrentWeather(data, data.displayUnit, artOpts);
-    display5DayForecast(data, data.displayUnit);
-  });
-
-program
-  .command('compare <city1> <city2>')
-  .description('Compare weather between two cities')
-  .option('-u, --units <type>', 'Temperature units (metric/imperial/celsius/fahrenheit)', 'auto')
-  .option('--celsius', 'Force Celsius temperature display')
-  .option('--fahrenheit', 'Force Fahrenheit temperature display')
-  .action(async (city1, city2, options) => {
-    const userUnits = processTemperatureOptions(options);
-    await compareWeather(city1, city2, userUnits);
-  });
-
-program
-  .command('coords <coordinates>')
-  .description('Get weather by GPS coordinates (format: lat,lon)')
-  .option('-u, --units <type>', 'Temperature units (metric/imperial/celsius/fahrenheit)', 'auto')
-  .option('--celsius', 'Force Celsius temperature display')
-  .option('--fahrenheit', 'Force Fahrenheit temperature display')
-  .option('--art', 'Display ASCII art weather scene')
-  .option('--no-art', 'Disable ASCII art')
-  .option('--art-style <style>', 'Art color style: default, retro')
-  .action(async (coordinates, options) => {
-    const [lat, lon] = coordinates.split(',').map((coord) => coord.trim());
-    const userUnits = processTemperatureOptions(options);
-    const artOpts = await buildArtOptions(options);
-    const data = await getWeatherByCoords(lat, lon, userUnits);
-    displayCurrentWeather(data, data.displayUnit, artOpts);
-  });
+withArtOptions(
+  withUnitOptions(
+    program
+      .command('coords <coordinates>')
+      .description('Get weather by GPS coordinates (format: lat,lon)')
+  )
+).action(async (coordinates, options) => {
+  const [lat, lon] = coordinates.split(',').map((c) => c.trim());
+  const userUnits = processTemperatureOptions(options);
+  const artOpts = await buildArtOptions(options);
+  const data = await getWeatherByCoords(lat, lon, userUnits);
+  displayCurrentWeather(data, data.displayUnit, artOpts);
+});
 
 program
   .command('config')
@@ -355,8 +302,7 @@ program
     console.log(chalk.green('✅ Configuration saved!'));
   });
 
-const authCommand = program.command('auth').description('Manage API authentication');
-
+const authCommand = new Command('auth').description('Manage API authentication');
 authCommand
   .command('set')
   .description('Set API key securely')
@@ -371,12 +317,10 @@ authCommand
       }
     ]);
 
-    // Test the key
     console.log(chalk.blue('Testing API key...'));
     try {
       await testApiKey(answers.apiKey);
       const saved = await setApiKey(answers.apiKey);
-
       if (saved) {
         console.log(chalk.green('✅ API key saved to system keychain'));
       } else {
@@ -386,11 +330,10 @@ authCommand
           )
         );
       }
-    } catch (_error) {
+    } catch {
       throw new WeatherError('Invalid API key', 'API_KEY_INVALID');
     }
   });
-
 authCommand
   .command('test')
   .description('Test API key validity')
@@ -398,6 +341,7 @@ authCommand
     await testApiKey();
     console.log(chalk.green('✅ API key is valid'));
   });
+program.addCommand(authCommand);
 
 program
   .command('cache')
@@ -428,99 +372,4 @@ program
   .description('Interactive mode with prompts')
   .action(interactiveMode);
 
-// Main execution
-async function main() {
-  try {
-    // Handle default case - if arguments exist but don't match commands, treat as location
-    const args = process.argv.slice(2);
-    const knownCommands = [
-      'now',
-      'forecast',
-      '5day',
-      'compare',
-      'coords',
-      'config',
-      'auth',
-      'cache',
-      'interactive',
-      'i',
-      'help',
-      '--help',
-      '-h',
-      '--version',
-      '-V'
-    ];
-    if (args.length === 0) {
-      // No arguments, start interactive mode
-      showBetaBanner();
-      await interactiveMode();
-    } else if (args.length > 0 && !knownCommands.includes(args[0])) {
-      // First argument is not a known command, treat as location for current weather
-      showBetaBanner();
-
-      // Filter out art-style value so it's not treated as a location word
-      const locationArgs = args.filter((arg, i) => {
-        if (args[i - 1] === '--art-style') return false;
-        return true;
-      });
-
-      // Use parseLocation to intelligently parse the location
-      const location = parseLocation(locationArgs);
-
-      if (!location) {
-        console.error(chalk.red('❌ Please specify a location'));
-        console.log(chalk.yellow('Examples: weather CA, weather San Ramon CA, weather London'));
-        process.exit(1);
-      }
-
-      // Process temperature options
-      const options = {
-        celsius: args.includes('--celsius'),
-        fahrenheit: args.includes('--fahrenheit'),
-        units:
-          args.includes('-u') || args.includes('--units')
-            ? args[args.indexOf(args.includes('-u') ? '-u' : '--units') + 1] || 'auto'
-            : 'auto'
-      };
-      const userUnits = processTemperatureOptions(options);
-
-      // Process art options
-      const artFlagOptions = {
-        art: args.includes('--art') ? true : args.includes('--no-art') ? false : undefined,
-        artOnly: args.includes('--art-only'),
-        artStyle: args.includes('--art-style')
-          ? args[args.indexOf('--art-style') + 1] || 'default'
-          : undefined,
-        animate: args.includes('--animate')
-      };
-      const artOpts = await buildArtOptions(artFlagOptions);
-
-      const showForecast = args.includes('-f') || args.includes('--forecast');
-
-      // Check cache first
-      const cacheKey = userUnits || 'auto';
-      const cached = await getCachedWeather(location, cacheKey);
-      let data;
-      if (cached) {
-        console.log(chalk.gray('📦 Using cached data...'));
-        data = cached;
-      } else {
-        data = await getWeather(location, userUnits);
-        await setCachedWeather(location, cacheKey, data);
-      }
-      displayCurrentWeather(data, data.displayUnit, artOpts);
-
-      if (showForecast && !artOpts.artOnly) {
-        display24HourForecast(data, data.displayUnit);
-      }
-    } else {
-      // Parse as normal commander commands
-      await program.parseAsync();
-    }
-  } catch (error) {
-    handleError(error);
-  }
-}
-
-// Run main function
-main();
+program.parseAsync().catch(handleError);

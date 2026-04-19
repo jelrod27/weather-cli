@@ -1,6 +1,6 @@
 {
   "name": "weather-cli-16bit",
-  "version": "0.3.60",
+  "version": "0.3.62",
   "description": "A simple, intelligent weather CLI with smart location detection - no quotes needed",
   "main": "index.js",
   "type": "module",
@@ -9,7 +9,7 @@
   },
   "preferGlobal": true,
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   },
   "os": [
     "darwin",
@@ -69,26 +69,24 @@
     "url": "https://github.com/deephouse23/weather-cli/issues"
   },
   "dependencies": {
-    "axios": "^1.11.0",
-    "axios-retry": "^4.0.0",
-    "boxen": "^7.1.1",
-    "chalk": "^5.5.0",
-    "commander": "^12.1.0",
-    "dotenv": "^16.6.1",
-    "inquirer": "^12.9.0",
-    "keytar": "^7.9.0",
-    "ora": "^8.2.0"
+    "@napi-rs/keyring": "^1.2.0",
+    "axios": "^1.15.0",
+    "axios-retry": "^4.5.0",
+    "boxen": "^8.0.1",
+    "chalk": "^5.6.2",
+    "commander": "^14.0.3",
+    "dotenv": "^17.4.2",
+    "inquirer": "^13.4.1",
+    "ora": "^9.3.0"
   },
   "devDependencies": {
-    "@playwright/mcp": "^0.0.64",
-    "@modelcontextprotocol/server-filesystem": "^2025.8.21",
-    "@playwright/test": "^1.55.0",
-    "eslint": "^9.0.0",
-    "eslint-config-prettier": "^10.0.0",
-    "husky": "^9.0.0",
-    "lint-staged": "^15.0.0",
-    "playwright": "^1.55.0",
-    "prettier": "^3.0.0",
-    "vitest": "^3.0.0"
+    "@playwright/test": "^1.59.1",
+    "eslint": "^10.2.1",
+    "eslint-config-prettier": "^10.1.8",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
+    "playwright": "^1.59.1",
+    "prettier": "^3.8.3",
+    "vitest": "^4.1.4"
   }
 }

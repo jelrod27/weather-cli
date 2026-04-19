@@ -1,26 +1,28 @@
-import keytar from 'keytar';
+import { Entry } from '@napi-rs/keyring';
 import dotenv from 'dotenv';
 import chalk from 'chalk';
 import { WeatherError, ERROR_CODES } from '../utils/errors.js';
 import httpClient from './http.js';
 
-dotenv.config();
+dotenv.config({ quiet: true });
 
 const SERVICE_NAME = 'weather-cli';
 const ACCOUNT_NAME = 'openweathermap-api-key';
 
+function getEntry() {
+  return new Entry(SERVICE_NAME, ACCOUNT_NAME);
+}
+
 export async function getApiKey() {
   try {
-    // Try keychain first
-    const keychainKey = await keytar.getPassword(SERVICE_NAME, ACCOUNT_NAME);
+    const keychainKey = getEntry().getPassword();
     if (keychainKey) {
       return keychainKey;
     }
-  } catch (error) {
+  } catch {
     console.warn(chalk.yellow('⚠️  Keychain access failed, falling back to environment variable'));
   }
 
-  // Fall back to environment variable
   const envKey = process.env.WEATHER_API_KEY;
   if (!envKey || envKey === 'your_openweathermap_api_key_here') {
     throw new WeatherError(
@@ -34,9 +36,9 @@ export async function getApiKey() {
 
 export async function setApiKey(apiKey) {
   try {
-    await keytar.setPassword(SERVICE_NAME, ACCOUNT_NAME, apiKey);
+    getEntry().setPassword(apiKey);
     return true;
-  } catch (error) {
+  } catch {
     console.warn(chalk.yellow('⚠️  Could not save to keychain, please use environment variable'));
     return false;
   }
@@ -44,8 +46,8 @@ export async function setApiKey(apiKey) {
 
 export async function deleteApiKey() {
   try {
-    return await keytar.deletePassword(SERVICE_NAME, ACCOUNT_NAME);
-  } catch (error) {
+    return getEntry().deletePassword();
+  } catch {
     return false;
   }
 }
