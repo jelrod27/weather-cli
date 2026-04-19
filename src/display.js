@@ -3,7 +3,6 @@ import boxen from 'boxen';
 import { getScene, isDaytime } from './ascii/index.js';
 import { AsciiRenderer } from './ascii/renderer.js';
 
-// Weather emoji mapping
 const weatherEmojis = {
   Clear: '☀️',
   Clouds: '☁️',
@@ -16,7 +15,6 @@ const weatherEmojis = {
   Haze: '🌫️'
 };
 
-// Format temperature with color coding
 function formatTemp(temp, displayUnit, options = {}) {
   const unit = displayUnit === 'fahrenheit' ? '°F' : '°C';
   const rounded = Math.round(temp);
@@ -31,7 +29,6 @@ function formatTemp(temp, displayUnit, options = {}) {
   return tempString;
 }
 
-// Format time
 function formatTime(timestamp) {
   return new Date(timestamp * 1000).toLocaleTimeString('en-US', {
     hour: '2-digit',
@@ -40,7 +37,6 @@ function formatTime(timestamp) {
   });
 }
 
-// Convert wind speed based on units
 function formatWindSpeed(speed, displayUnit) {
   if (displayUnit === 'fahrenheit') {
     const mph = speed * 2.237;
@@ -49,26 +45,12 @@ function formatWindSpeed(speed, displayUnit) {
   return `${speed} m/s`;
 }
 
-// Create a data row with consistent alignment
 function createDataRow(label, value, options = {}) {
-  const { labelWidth = 20, valueWidth = 30, icon = '' } = options;
+  const { labelWidth = 20, icon = '' } = options;
   const formattedLabel = icon ? `${icon} ${label}` : label;
   return `${formattedLabel.padEnd(labelWidth)} ${value}`;
 }
 
-// Display weather banner with ASCII art
-function displayWeatherBanner() {
-  console.log(
-    chalk.cyan.bold(`
-╔════════════════════════════════════════════╗
-║           🌤️  WEATHER CLI  🌤️              ║
-║         Your Terminal Weather Friend       ║
-╚════════════════════════════════════════════╝
-`)
-  );
-}
-
-// Get air quality description with color
 function getAirQualityDescription(aqi) {
   const descriptions = {
     1: { text: 'Good', color: chalk.green },
@@ -81,24 +63,39 @@ function getAirQualityDescription(aqi) {
   return desc.color(desc.text);
 }
 
-// Get terminal width
 function getTerminalWidth() {
   return process.stdout.columns || 80;
 }
 
-// Display current weather in compact horizontal layout
+// Strip ANSI escape codes so padEnd uses visible width
+const ANSI_RE = /\x1b\[[0-9;]*m/g;
+function visibleLength(str) {
+  return str.replace(ANSI_RE, '').length;
+}
+function padVisible(str, width) {
+  const pad = Math.max(0, width - visibleLength(str));
+  return str + ' '.repeat(pad);
+}
+
+function renderTwoColumnRows(leftCol, rightCol, leftWidth) {
+  const rows = [];
+  const height = Math.max(leftCol.length, rightCol.length);
+  for (let i = 0; i < height; i++) {
+    const l = leftCol[i] || '';
+    const r = rightCol[i] || '';
+    rows.push(r ? `${padVisible(l, leftWidth)}  ${r}` : l);
+  }
+  return rows.join('\n');
+}
+
 function displayCurrentWeather(data, displayUnit, options = {}) {
-  // Check if data has current property or is the weather data directly
   const weather = data.current || data;
 
-  // Add safety checks for weather data
   if (!weather || !weather.weather || !weather.weather[0]) {
     console.error(chalk.red('❌ Invalid weather data structure'));
     return;
   }
 
-  // ASCII art rendering (opt-in via --art flag)
-  // When artOnly, render art even when not a TTY (e.g. piped) so output is not silent
   const canShowArt = options.art && (process.stdout.isTTY || options.artOnly);
   if (canShowArt) {
     const conditionCode = weather.weather[0].id;
@@ -110,120 +107,75 @@ function displayCurrentWeather(data, displayUnit, options = {}) {
       paletteName
     });
 
-    // Handle animation vs static render
     if (options.animate && process.stdout.isTTY && scene.getFrames) {
-      // Start animation loop only if scene supports frames
       const stopAnimation = renderer.animate(scene, { isDay });
-
-      // Keep animation running until user interrupts (Ctrl+C)
-      // The animation will stop naturally on process exit
       process.on('SIGINT', () => {
         stopAnimation();
         process.exit(0);
       });
-
-      // Return early - animation is running, don't print weather data below
-      // as it would get cleared by the animation loop
       return;
     } else {
       renderer.render(scene, { isDay });
     }
 
-    if (options.artOnly) {
-      return;
-    }
+    if (options.artOnly) return;
     console.log();
   }
 
   const emoji = weatherEmojis[weather.weather[0].main] || '🌤️';
-  const terminalWidth = getTerminalWidth();
+  const termWidth = getTerminalWidth();
 
-  // Add timestamp
-  const timestamp = new Date().toLocaleTimeString('en-US', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true
-  });
+  const boxWidth = Math.min(termWidth - 2, 88);
+  const innerWidth = boxWidth - 4;
+  const useTwoCol = innerWidth >= 64;
 
-  // Compact location header with timestamp
-  const locationHeader = `${emoji} ${chalk.cyan.bold(weather.name)}, ${chalk.yellow.bold(weather.sys.country)} ${chalk.gray(`• ${timestamp}`)}`;
+  const locationHeader = `${emoji}  ${chalk.cyan.bold(weather.name)}, ${chalk.yellow.bold(weather.sys.country)}`;
 
-  // Compact separator - shorter
-  const separator = chalk.gray('─'.repeat(40));
-
-  // More compact sections with tighter spacing
-  const tempSection = [
-    createDataRow(
-      'Temp:',
-      `${formatTemp(weather.main.temp, displayUnit, { colorCode: true, type: 'current' })} (feels ${formatTemp(weather.main.feels_like, displayUnit)})`,
-      { labelWidth: 8 }
-    ),
-    createDataRow(
-      'Range:',
-      `${formatTemp(weather.main.temp_min, displayUnit, { colorCode: true, type: 'min' })} - ${formatTemp(weather.main.temp_max, displayUnit, { colorCode: true, type: 'max' })}`,
-      { labelWidth: 8 }
-    )
-  ].join('\n');
-
-  const conditionsSection = [
-    createDataRow('Weather:', weather.weather[0].description, { labelWidth: 8 }),
-    createDataRow(
-      'Humidity:',
-      `${weather.main.humidity}% • ${weather.main.pressure}hPa • ${(weather.visibility / 1000).toFixed(1)}km`,
-      { labelWidth: 8 }
-    )
-  ].join('\n');
-
-  const windSection = [
-    createDataRow(
-      'Wind:',
-      `${formatWindSpeed(weather.wind.speed, displayUnit)} ${weather.wind.deg}°${weather.wind.gust ? ` (gust ${formatWindSpeed(weather.wind.gust, displayUnit)})` : ''}`,
-      { labelWidth: 8 }
-    )
-  ].join('\n');
-
-  const sunSection = [
-    createDataRow(
-      'Sun:',
-      `${formatTime(weather.sys.sunrise)} - ${formatTime(weather.sys.sunset)}`,
-      { labelWidth: 8 }
-    )
-  ].join('\n');
-
-  // Air quality section - more compact
   const aqi = data.pollution?.list?.[0]?.main?.aqi;
-  const airQualitySection = aqi
-    ? [
-        createDataRow('Air:', `${getAirQualityDescription(aqi)} (AQI: ${aqi})`, { labelWidth: 8 })
-      ].join('\n')
+  const windGust = weather.wind.gust
+    ? ` (gust ${formatWindSpeed(weather.wind.gust, displayUnit)})`
     : '';
+  const wind = `${formatWindSpeed(weather.wind.speed, displayUnit)} @ ${weather.wind.deg}°${windGust}`;
+  const visKm = (weather.visibility / 1000).toFixed(1);
 
-  // Always use single column for more compact display
-  const content = [
-    locationHeader,
-    separator,
-    tempSection,
-    conditionsSection,
-    windSection,
-    sunSection,
-    airQualitySection
-  ]
-    .filter(Boolean)
-    .join('\n');
+  const left = [
+    chalk.gray(weather.weather[0].description),
+    formatTemp(weather.main.temp, displayUnit, { colorCode: true, type: 'current' }),
+    `Feels like: ${formatTemp(weather.main.feels_like, displayUnit)}`,
+    `Humidity:   ${weather.main.humidity}%`,
+    `Pressure:   ${weather.main.pressure} hPa`
+  ];
 
-  // More compact box with smaller padding
+  const right = [
+    `Sunrise:     ${formatTime(weather.sys.sunrise)}`,
+    `Sunset:      ${formatTime(weather.sys.sunset)}`,
+    aqi ? `Air Quality: ${getAirQualityDescription(aqi)} (AQI: ${aqi})` : '',
+    `Min/Max:     ${formatTemp(weather.main.temp_min, displayUnit, { colorCode: true, type: 'min' })} / ${formatTemp(weather.main.temp_max, displayUnit, { colorCode: true, type: 'max' })}`,
+    `Wind:        ${wind}`,
+    `Visibility:  ${visKm} km`
+  ].filter(Boolean);
+
+  let body;
+  if (useTwoCol) {
+    const leftWidth = Math.max(...left.map(visibleLength), 20);
+    body = renderTwoColumnRows(left, right, leftWidth);
+  } else {
+    body = [...left, ...right].join('\n');
+  }
+
+  const content = [locationHeader, '', body].join('\n');
+
   console.log(
     boxen(content, {
       padding: { top: 0, bottom: 0, left: 1, right: 1 },
       margin: 0,
       borderStyle: 'round',
       borderColor: 'cyan',
-      width: Math.min(terminalWidth - 2, 80)
+      width: boxWidth
     })
   );
 }
 
-// Display compact 5-day forecast
 function display5DayForecast(data, displayUnit) {
   const dailyData = {};
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -256,7 +208,6 @@ function display5DayForecast(data, displayUnit) {
       const minTemp = Math.min(...info.temps);
       const maxTemp = Math.max(...info.temps);
 
-      // Get most common weather
       const weatherCount = {};
       info.descriptions.forEach((desc) => {
         weatherCount[desc.main] = (weatherCount[desc.main] || 0) + 1;
@@ -280,9 +231,8 @@ function display5DayForecast(data, displayUnit) {
   );
 }
 
-// Display compact 24-hour forecast
 function display24HourForecast(data, displayUnit) {
-  const next24Hours = data.forecast.list.slice(0, 8); // 3-hour intervals
+  const next24Hours = data.forecast.list.slice(0, 8);
 
   const forecastLines = next24Hours.map((item) => {
     const time = new Date(item.dt * 1000).toLocaleTimeString('en-US', {
@@ -312,6 +262,5 @@ export {
   displayCurrentWeather,
   display5DayForecast,
   display24HourForecast,
-  displayWeatherBanner,
   createDataRow
 };
