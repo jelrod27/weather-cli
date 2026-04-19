@@ -1,9 +1,9 @@
-# weather-cli-16bit v0.3.59
+# weather-cli-16bit v0.3.62
 
 [![npm version](https://badge.fury.io/js/weather-cli-16bit.svg)](https://www.npmjs.com/package/weather-cli-16bit)
 [![CI](https://github.com/deephouse23/weather-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/deephouse23/weather-cli/actions/workflows/ci.yml)
 ![License](https://img.shields.io/badge/license-MIT-blue)
-![Node.js](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)
+![Node.js](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen)
 
 Part of the 16bitweather suite of weather tools.
 
@@ -31,7 +31,7 @@ npm link
 
 ### Requirements
 
-- Node.js v18.0.0 or higher
+- Node.js v20.0.0 or higher
 - OpenWeatherMap API key (free at [openweathermap.org](https://openweathermap.org/api))
 
 ### Setup
@@ -173,7 +173,7 @@ tests/unit/
 
 ### Prerequisites
 
-- Node.js v18+
+- Node.js v20+
 - npm
 
 ### Scripts
@@ -195,7 +195,7 @@ npm run dev              # Dev mode with auto-restart
 - **ESLint v9** — flat config with Prettier integration
 - **Prettier** — consistent code formatting
 - **Husky** — pre-commit hook runs lint-staged
-- **GitHub Actions CI** — lint + test matrix (Node 18, 20, 22)
+- **GitHub Actions CI** — lint + test matrix (Node 20, 22, 24)
 
 ### Contributing
 
@@ -230,7 +230,7 @@ npm run dev              # Dev mode with auto-restart
 | `--fahrenheit`       | Force Fahrenheit display                 |
 | `-f, --forecast`     | Include 24-hour forecast                 |
 | `-a, --alerts`       | Show weather alerts                      |
-| `--art`              | Display ASCII art weather scene         |
+| `--art`              | Display ASCII art weather scene          |
 | `--animate`          | Animate the ASCII art scene              |
 
 ## License
