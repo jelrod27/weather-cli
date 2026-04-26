@@ -1,0 +1,156 @@
+import { describe, it, expect } from 'vitest';
+import { parseLocationQuery, normalizeToOwmShape } from '../../src/api/openmeteo.js';
+
+describe('parseLocationQuery', () => {
+  it('parses a plain city name', () => {
+    expect(parseLocationQuery('London')).toEqual({
+      name: 'London',
+      country: null,
+      admin1: null
+    });
+  });
+
+  it('parses "City, Country"', () => {
+    expect(parseLocationQuery('London, UK')).toEqual({
+      name: 'London',
+      country: 'GB', // UK aliased to GB
+      admin1: null
+    });
+  });
+
+  it('parses "City, State, Country" with admin1 hint', () => {
+    expect(parseLocationQuery('San Ramon, CA, US')).toEqual({
+      name: 'San Ramon',
+      country: 'US',
+      admin1: 'CA'
+    });
+  });
+
+  it('does not treat long trailing tokens as country codes', () => {
+    expect(parseLocationQuery('Saint Petersburg, Russia')).toEqual({
+      name: 'Saint Petersburg',
+      country: null,
+      admin1: null
+    });
+  });
+
+  it('handles trimming and empty parts', () => {
+    expect(parseLocationQuery('  Tokyo  ,  JP  ')).toEqual({
+      name: 'Tokyo',
+      country: 'JP',
+      admin1: null
+    });
+  });
+});
+
+describe('normalizeToOwmShape', () => {
+  // Minimal Open-Meteo-shaped fixture
+  const place = {
+    name: 'San Ramon',
+    lat: 37.78,
+    lon: -121.97,
+    country: 'US',
+    admin1: 'California'
+  };
+
+  const forecast = {
+    current: {
+      time: '2026-04-26T12:00',
+      temperature_2m: 72,
+      apparent_temperature: 70,
+      relative_humidity_2m: 55,
+      pressure_msl: 1015,
+      weather_code: 2, // partly cloudy
+      is_day: 1,
+      wind_speed_10m: 5,
+      wind_direction_10m: 270,
+      wind_gusts_10m: 9,
+      cloud_cover: 40
+    },
+    hourly: {
+      time: [
+        '2026-04-26T00:00',
+        '2026-04-26T03:00',
+        '2026-04-26T06:00',
+        '2026-04-26T09:00',
+        '2026-04-26T12:00',
+        '2026-04-26T15:00',
+        '2026-04-26T18:00',
+        '2026-04-26T21:00'
+      ],
+      temperature_2m: [55, 53, 52, 60, 72, 75, 70, 62],
+      weather_code: [0, 0, 1, 1, 2, 2, 3, 3],
+      wind_speed_10m: [3, 3, 3, 4, 5, 6, 5, 4],
+      wind_direction_10m: [270, 270, 270, 270, 270, 270, 270, 270],
+      relative_humidity_2m: [70, 72, 75, 65, 55, 50, 55, 60],
+      visibility: [16000, 16000, 16000, 14000, 12000, 12000, 14000, 16000]
+    },
+    daily: {
+      time: ['2026-04-26', '2026-04-27', '2026-04-28', '2026-04-29', '2026-04-30'],
+      weather_code: [2, 1, 0, 61, 80],
+      temperature_2m_max: [76, 74, 78, 70, 68],
+      temperature_2m_min: [52, 51, 53, 55, 54],
+      sunrise: [
+        '2026-04-26T06:15',
+        '2026-04-27T06:14',
+        '2026-04-28T06:13',
+        '2026-04-29T06:12',
+        '2026-04-30T06:11'
+      ],
+      sunset: [
+        '2026-04-26T19:50',
+        '2026-04-27T19:51',
+        '2026-04-28T19:52',
+        '2026-04-29T19:53',
+        '2026-04-30T19:54'
+      ]
+    }
+  };
+
+  it('produces an OWM-shaped current block', () => {
+    const data = normalizeToOwmShape({ place, forecast, usAqi: 42 });
+    expect(data.current.name).toBe('San Ramon');
+    expect(data.current.coord).toEqual({ lat: 37.78, lon: -121.97 });
+    expect(data.current.sys.country).toBe('US');
+    expect(typeof data.current.sys.sunrise).toBe('number');
+    expect(typeof data.current.sys.sunset).toBe('number');
+    expect(data.current.main.temp).toBe(72);
+    expect(data.current.main.feels_like).toBe(70);
+    expect(data.current.main.humidity).toBe(55);
+    expect(data.current.main.pressure).toBe(1015);
+    expect(data.current.main.temp_min).toBe(52);
+    expect(data.current.main.temp_max).toBe(76);
+    expect(data.current.weather[0]).toEqual({
+      id: 802,
+      main: 'Clouds',
+      description: 'partly cloudy'
+    });
+    expect(data.current.wind.speed).toBe(5);
+    expect(data.current.wind.gust).toBe(9);
+  });
+
+  it('produces a forecast list at 3-hour stride', () => {
+    const data = normalizeToOwmShape({ place, forecast, usAqi: 42 });
+    expect(Array.isArray(data.forecast.list)).toBe(true);
+    // 8 hourly entries, stride 3 → indices 0, 3, 6 → 3 entries
+    expect(data.forecast.list.length).toBe(3);
+    expect(data.forecast.list[0].main.temp).toBe(55);
+    expect(data.forecast.list[0].weather[0].id).toBe(800); // WMO 0 → OWM 800
+    expect(data.forecast.list[1].main.temp).toBe(60);
+    expect(data.forecast.list[1].weather[0].id).toBe(801); // WMO 1 → OWM 801
+  });
+
+  it('normalizes air quality from US AQI to OWM 1–5 scale', () => {
+    const data = normalizeToOwmShape({ place, forecast, usAqi: 42 });
+    expect(data.pollution.list[0].main.aqi).toBe(1);
+
+    const noAqi = normalizeToOwmShape({ place, forecast, usAqi: null });
+    expect(noAqi.pollution.list).toEqual([]);
+  });
+
+  it('uses visibility from the hourly entry nearest the current time', () => {
+    const data = normalizeToOwmShape({ place, forecast, usAqi: null });
+    // Current time is 12:00, which matches index 4 → visibility 12000
+    expect(data.current.visibility).toBe(12000);
+  });
+});

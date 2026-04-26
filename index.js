@@ -1,9 +1,8 @@
 #!/usr/bin/env node
 
-import { program, Command } from 'commander';
+import { program } from 'commander';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
-import dotenv from 'dotenv';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -30,10 +29,7 @@ import {
   getAsciiConfig
 } from './src/config.js';
 import { WeatherError, mapErrorToExitCode } from './src/utils/errors.js';
-import { setApiKey, testApiKey } from './src/api/auth.js';
 import { parseLocation } from './src/utils/locationParser.js';
-
-dotenv.config({ quiet: true });
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const packageJson = JSON.parse(readFileSync(join(__dirname, 'package.json'), 'utf8'));
@@ -184,10 +180,7 @@ async function interactiveMode() {
 function handleError(error) {
   if (error instanceof WeatherError) {
     console.error(chalk.red(`❌ ${error.message}`));
-    if (error.code === 'API_KEY_MISSING') {
-      console.log(chalk.yellow('Get your free API key at: https://openweathermap.org/api'));
-      console.log(chalk.yellow('Then run: weather auth set'));
-    } else if (error.code === 'LOCATION_NOT_FOUND') {
+    if (error.code === 'LOCATION_NOT_FOUND') {
       console.log(chalk.yellow('Examples: "San Ramon, CA" or "London, UK"'));
     }
   } else {
@@ -301,47 +294,6 @@ program
     await setDefaultUnits(answers.defaultUnits);
     console.log(chalk.green('✅ Configuration saved!'));
   });
-
-const authCommand = new Command('auth').description('Manage API authentication');
-authCommand
-  .command('set')
-  .description('Set API key securely')
-  .action(async () => {
-    const answers = await inquirer.prompt([
-      {
-        type: 'password',
-        name: 'apiKey',
-        message: 'Enter your OpenWeatherMap API key:',
-        mask: '*',
-        validate: (input) => input.length > 0 || 'API key cannot be empty'
-      }
-    ]);
-
-    console.log(chalk.blue('Testing API key...'));
-    try {
-      await testApiKey(answers.apiKey);
-      const saved = await setApiKey(answers.apiKey);
-      if (saved) {
-        console.log(chalk.green('✅ API key saved to system keychain'));
-      } else {
-        console.log(
-          chalk.yellow(
-            '⚠️  Could not save to keychain, please set WEATHER_API_KEY environment variable'
-          )
-        );
-      }
-    } catch {
-      throw new WeatherError('Invalid API key', 'API_KEY_INVALID');
-    }
-  });
-authCommand
-  .command('test')
-  .description('Test API key validity')
-  .action(async () => {
-    await testApiKey();
-    console.log(chalk.green('✅ API key is valid'));
-  });
-program.addCommand(authCommand);
 
 program
   .command('cache')

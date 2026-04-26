@@ -10,9 +10,6 @@ export class WeatherError extends Error {
 export function mapErrorToExitCode(error) {
   if (error instanceof WeatherError) {
     switch (error.code) {
-      case 'API_KEY_MISSING':
-      case 'API_KEY_INVALID':
-        return 2;
       case 'LOCATION_NOT_FOUND':
         return 3;
       case 'NETWORK_ERROR':
@@ -29,8 +26,6 @@ export function mapErrorToExitCode(error) {
 }
 
 export const ERROR_CODES = {
-  API_KEY_MISSING: 'API_KEY_MISSING',
-  API_KEY_INVALID: 'API_KEY_INVALID',
   LOCATION_NOT_FOUND: 'LOCATION_NOT_FOUND',
   NETWORK_ERROR: 'NETWORK_ERROR',
   RATE_LIMIT: 'RATE_LIMIT',

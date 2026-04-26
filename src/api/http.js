@@ -17,7 +17,7 @@ const httpClient = axios.create({
 
 // Add request interceptor to set unique request ID per request
 httpClient.interceptors.request.use((config) => {
-  config.headers['X-Request-ID'] = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  config.headers['X-Request-ID'] = `req_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
   return config;
 });
 

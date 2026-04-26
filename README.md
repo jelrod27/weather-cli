@@ -1,4 +1,4 @@
-# weather-cli-16bit v0.3.62
+# weather-cli-16bit v0.4.0
 
 [![npm version](https://badge.fury.io/js/weather-cli-16bit.svg)](https://www.npmjs.com/package/weather-cli-16bit)
 [![CI](https://github.com/deephouse23/weather-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/deephouse23/weather-cli/actions/workflows/ci.yml)
@@ -7,9 +7,9 @@
 
 Part of the 16bitweather suite of weather tools.
 
-A command-line weather application with smart location parsing, responsive terminal display, and secure API key storage.
+A command-line weather application with smart location parsing and responsive terminal display, powered by [Open-Meteo](https://open-meteo.com).
 
-**No quotes needed — just type `weather San Ramon CA` from anywhere on your system.**
+**No API key, no signup — just type `weather San Ramon CA` from anywhere on your system.**
 
 ## Installation
 
@@ -32,21 +32,8 @@ npm link
 ### Requirements
 
 - Node.js v20.0.0 or higher
-- OpenWeatherMap API key (free at [openweathermap.org](https://openweathermap.org/api))
 
-### Setup
-
-```bash
-# Secure API key setup (recommended — stores in OS keychain)
-weather auth set
-
-# Test your API key
-weather auth test
-
-# Alternative: environment variable
-cp .env.example .env
-# Edit .env and add your OpenWeatherMap API key
-```
+That's it — no API key required.
 
 ## Usage
 
@@ -95,10 +82,6 @@ weather                       # No arguments starts interactive mode
 weather config                # Set default location and units
 weather cache                 # View cache statistics
 weather cache -c              # Clear cache
-
-# Authentication
-weather auth set              # Store API key securely
-weather auth test             # Validate your API key
 ```
 
 ### Temperature Units
@@ -136,13 +119,14 @@ Responsive layout adapts to terminal width (compact, medium, and full views).
 
 ```
 src/
-├── weather.js           # API calls and weather logic
+├── weather.js           # Provider orchestration + unit auto-detect
 ├── cache.js             # Caching with expiration
 ├── display.js           # Terminal formatting and output
 ├── config.js            # Configuration management
 ├── api/
-│   ├── auth.js          # Secure authentication (keytar)
-│   └── http.js          # HTTP client with retry logic
+│   ├── http.js          # HTTP client with retry logic
+│   ├── openmeteo.js     # Open-Meteo client + OWM-shape adapter
+│   └── wmoToOwm.js      # WMO weather code + US-AQI normalization
 └── utils/
     ├── errors.js        # Error handling utilities
     ├── locationParser.js # Smart location parsing
@@ -161,8 +145,8 @@ tests/unit/
 
 ## Features
 
+- **No API key required** — backed by Open-Meteo's free public API
 - **Smart Location Parsing** — no quotes needed, supports US states, Canadian provinces, country codes
-- **Secure API Keys** — OS keychain via `keytar`, fallback to env var
 - **Smart Caching** — 30-minute expiry, 100-entry limit, LRU eviction
 - **Responsive Display** — adapts to terminal width with color-coded output
 - **Forecasts** — 24-hour and 5-day, city comparison, GPS coordinates
@@ -218,8 +202,6 @@ npm run dev              # Dev mode with auto-restart
 | `weather config`                  | Set defaults               |
 | `weather cache`                   | View cache stats           |
 | `weather cache -c`                | Clear cache                |
-| `weather auth set`                | Store API key              |
-| `weather auth test`               | Test API key               |
 
 ### Options
 
@@ -243,4 +225,4 @@ MIT — see [LICENSE](LICENSE).
 - **Homepage**: [16bitweather.co](https://16bitweather.co)
 - **Repository**: [GitHub](https://github.com/deephouse23/weather-cli)
 - **Issues**: [GitHub Issues](https://github.com/deephouse23/weather-cli/issues)
-- **API**: [OpenWeatherMap](https://openweathermap.org/api)
+- **API**: [Open-Meteo](https://open-meteo.com) (free, no API key required)

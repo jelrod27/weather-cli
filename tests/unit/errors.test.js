@@ -3,9 +3,9 @@ import { WeatherError, mapErrorToExitCode, ERROR_CODES } from '../../src/utils/e
 
 describe('WeatherError', () => {
   it('creates an error with message and code', () => {
-    const error = new WeatherError('test message', 'API_KEY_MISSING');
+    const error = new WeatherError('test message', 'NETWORK_ERROR');
     expect(error.message).toBe('test message');
-    expect(error.code).toBe('API_KEY_MISSING');
+    expect(error.code).toBe('NETWORK_ERROR');
     expect(error.name).toBe('WeatherError');
     expect(error.statusCode).toBeNull();
   });
@@ -23,16 +23,6 @@ describe('WeatherError', () => {
 });
 
 describe('mapErrorToExitCode', () => {
-  it('maps API_KEY_MISSING to exit code 2', () => {
-    const error = new WeatherError('msg', ERROR_CODES.API_KEY_MISSING);
-    expect(mapErrorToExitCode(error)).toBe(2);
-  });
-
-  it('maps API_KEY_INVALID to exit code 2', () => {
-    const error = new WeatherError('msg', ERROR_CODES.API_KEY_INVALID);
-    expect(mapErrorToExitCode(error)).toBe(2);
-  });
-
   it('maps LOCATION_NOT_FOUND to exit code 3', () => {
     const error = new WeatherError('msg', ERROR_CODES.LOCATION_NOT_FOUND);
     expect(mapErrorToExitCode(error)).toBe(3);
@@ -65,8 +55,6 @@ describe('mapErrorToExitCode', () => {
 
 describe('ERROR_CODES', () => {
   it('contains all expected codes', () => {
-    expect(ERROR_CODES.API_KEY_MISSING).toBe('API_KEY_MISSING');
-    expect(ERROR_CODES.API_KEY_INVALID).toBe('API_KEY_INVALID');
     expect(ERROR_CODES.LOCATION_NOT_FOUND).toBe('LOCATION_NOT_FOUND');
     expect(ERROR_CODES.NETWORK_ERROR).toBe('NETWORK_ERROR');
     expect(ERROR_CODES.RATE_LIMIT).toBe('RATE_LIMIT');

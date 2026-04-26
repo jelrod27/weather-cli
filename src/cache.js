@@ -10,6 +10,8 @@ const CACHE_FILE = join(__dirname, '..', '.weather-cache.json');
 const CACHE_EXPIRY = 30 * 60 * 1000; // 30 minutes
 const MAX_CACHE_SIZE = 100; // Maximum number of entries
 const MAX_CACHE_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days
+// Bump when the cached `data` shape changes. Old entries are discarded on read.
+const CACHE_SCHEMA_VERSION = 2;
 
 // Simple LRU tracking
 const accessOrder = [];
@@ -28,7 +30,7 @@ async function loadCache() {
 async function saveCache(cache) {
   try {
     await fs.writeFile(CACHE_FILE, JSON.stringify(cache, null, 2));
-  } catch (error) {
+  } catch {
     throw new WeatherError('Failed to save cache', ERROR_CODES.CACHE_ERROR);
   }
 }
@@ -65,13 +67,17 @@ async function evictOldEntries(cache) {
   return updatedCache;
 }
 
-// Get cached weather data if not expired
+// Get cached weather data if not expired and schema matches
 async function getCachedWeather(location, units) {
   const cache = await loadCache();
   const key = `${location}-${units}`;
   const cached = cache[key];
 
-  if (cached && Date.now() - cached.timestamp < CACHE_EXPIRY) {
+  if (
+    cached &&
+    cached.schemaVersion === CACHE_SCHEMA_VERSION &&
+    Date.now() - cached.timestamp < CACHE_EXPIRY
+  ) {
     // Update access order for LRU
     const index = accessOrder.indexOf(key);
     if (index > -1) {
@@ -91,7 +97,8 @@ async function setCachedWeather(location, units, data) {
   const key = `${location}-${units}`;
   cache[key] = {
     data,
-    timestamp: Date.now()
+    timestamp: Date.now(),
+    schemaVersion: CACHE_SCHEMA_VERSION
   };
 
   // Update access order
@@ -135,7 +142,7 @@ async function getCacheStats() {
   let expired = 0;
   let valid = 0;
 
-  for (const [key, value] of Object.entries(cache)) {
+  for (const value of Object.values(cache)) {
     total++;
     if (now - value.timestamp >= CACHE_EXPIRY) {
       expired++;

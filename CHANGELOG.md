@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-04-26
+
+### 💥 Breaking
+
+- **Full data-source cutover from OpenWeatherMap to [Open-Meteo](https://open-meteo.com).** No API key, no signup, no `WEATHER_API_KEY` env var, no OS keychain.
+- Removed the `weather auth` subcommand (`auth set`, `auth test`) — there's no longer anything to authenticate.
+- Removed dependencies: `@napi-rs/keyring`, `dotenv`. `.env.example` deleted.
+- Error codes `API_KEY_MISSING` and `API_KEY_INVALID` removed (exit code 2 retired).
+- Cache schema bumped to v2; pre-0.4 entries from `.weather-cache.json` are silently discarded on first read.
+
+### ✨ Added
+
+- `src/api/openmeteo.js` — geocoding + forecast + air-quality client that normalizes Open-Meteo responses into the existing display shape.
+- `src/api/wmoToOwm.js` — WMO weather-code → OWM-condition-code table (preserves the ascii `SCENE_MAP`) and US-AQI → 1–5 normalization.
+
+### 🔧 Improved
+
+- Eliminated the "fetch twice for units" round-trip — country auto-detect now uses the geocoding result directly, dropping one HTTP call per request.
+- `locationParser` `IN`/`DE` collisions (Indiana vs India, Delaware vs Germany) are no longer load-bearing for unit detection — geocoding handles disambiguation.
+- Replaced deprecated `String.prototype.substr` in HTTP client.
+
 ## [0.3.2] - 2025-08-26
 
 ### 🐛 **Fixed**
