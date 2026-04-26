@@ -76,14 +76,27 @@ describe('normalizeToOwmShape', () => {
         '2026-04-26T12:00',
         '2026-04-26T15:00',
         '2026-04-26T18:00',
-        '2026-04-26T21:00'
+        '2026-04-26T21:00',
+        '2026-04-27T00:00',
+        '2026-04-27T03:00',
+        '2026-04-27T06:00',
+        '2026-04-27T09:00',
+        '2026-04-27T12:00',
+        '2026-04-27T15:00',
+        '2026-04-27T18:00',
+        '2026-04-27T21:00'
       ],
-      temperature_2m: [55, 53, 52, 60, 72, 75, 70, 62],
-      weather_code: [0, 0, 1, 1, 2, 2, 3, 3],
-      wind_speed_10m: [3, 3, 3, 4, 5, 6, 5, 4],
-      wind_direction_10m: [270, 270, 270, 270, 270, 270, 270, 270],
-      relative_humidity_2m: [70, 72, 75, 65, 55, 50, 55, 60],
-      visibility: [16000, 16000, 16000, 14000, 12000, 12000, 14000, 16000]
+      temperature_2m: [55, 53, 52, 60, 72, 75, 70, 62, 50, 51, 50, 58, 70, 73, 68, 60],
+      weather_code: [0, 0, 1, 1, 2, 2, 3, 3, 0, 0, 1, 1, 2, 2, 3, 3],
+      wind_speed_10m: [3, 3, 3, 4, 5, 6, 5, 4, 3, 3, 3, 4, 5, 6, 5, 4],
+      wind_direction_10m: [
+        270, 270, 270, 270, 270, 270, 270, 270, 270, 270, 270, 270, 270, 270, 270, 270
+      ],
+      relative_humidity_2m: [70, 72, 75, 65, 55, 50, 55, 60, 70, 72, 75, 65, 55, 50, 55, 60],
+      visibility: [
+        16000, 16000, 16000, 14000, 12000, 12000, 14000, 16000, 16000, 16000, 16000, 14000, 12000,
+        12000, 14000, 16000
+      ]
     },
     daily: {
       time: ['2026-04-26', '2026-04-27', '2026-04-28', '2026-04-29', '2026-04-30'],
@@ -129,15 +142,18 @@ describe('normalizeToOwmShape', () => {
     expect(data.current.wind.gust).toBe(9);
   });
 
-  it('produces a forecast list at 3-hour stride', () => {
+  it('produces a future-only forecast list at 3-hour stride', () => {
     const data = normalizeToOwmShape({ place, forecast, usAqi: 42 });
     expect(Array.isArray(data.forecast.list)).toBe(true);
-    // 8 hourly entries, stride 3 → indices 0, 3, 6 → 3 entries
-    expect(data.forecast.list.length).toBe(3);
-    expect(data.forecast.list[0].main.temp).toBe(55);
-    expect(data.forecast.list[0].weather[0].id).toBe(800); // WMO 0 → OWM 800
-    expect(data.forecast.list[1].main.temp).toBe(60);
-    expect(data.forecast.list[1].weather[0].id).toBe(801); // WMO 1 → OWM 801
+    // current.time is 12:00 (curIdx=4); next 3-hour boundary >= 4 is 6.
+    // Indices 6, 9, 12, 15 → 4 future entries.
+    expect(data.forecast.list.length).toBe(4);
+    expect(data.forecast.list[0].dt_txt).toBe('2026-04-26T18:00');
+    expect(data.forecast.list[0].main.temp).toBe(70);
+    expect(data.forecast.list[0].weather[0].id).toBe(804); // WMO 3 → OWM 804
+    expect(data.forecast.list[1].dt_txt).toBe('2026-04-27T03:00');
+    expect(data.forecast.list[1].main.temp).toBe(51);
+    expect(data.forecast.list[1].weather[0].id).toBe(800); // WMO 0 → OWM 800
   });
 
   it('normalizes air quality from US AQI to OWM 1–5 scale', () => {

@@ -158,7 +158,11 @@ export function normalizeToOwmShape({ place, forecast, usAqi }) {
 
   const list = [];
   const times = hourly.time || [];
-  for (let i = 0; i < times.length && list.length < 40; i += 3) {
+  // Open-Meteo hourly starts at 00:00 local with no past_days, so times[0] is
+  // midnight today. Align to the next 3-hour boundary at or after the current
+  // hour so the list mirrors OWM's future-only 3-hour periods.
+  const startIdx = Math.ceil(curIdx / 3) * 3;
+  for (let i = startIdx; i < times.length && list.length < 40; i += 3) {
     const wmo = wmoToOwm(hourly.weather_code?.[i]);
     list.push({
       dt: isoToUnix(times[i]),
