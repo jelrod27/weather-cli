@@ -118,7 +118,9 @@ function displayCurrentWeather(data, displayUnit, options = {}) {
   const innerWidth = boxWidth - 4;
   const useTwoCol = innerWidth >= 64;
 
-  const locationHeader = `${emoji}  ${chalk.cyan.bold(weather.name)}, ${chalk.yellow.bold(weather.sys.country)}`;
+  const locationHeader = weather.sys.country
+    ? `${emoji}  ${chalk.cyan.bold(weather.name)}, ${chalk.yellow.bold(weather.sys.country)}`
+    : `${emoji}  ${chalk.cyan.bold(weather.name)}`;
 
   const aqi = data.pollution?.list?.[0]?.main?.aqi;
   const windGust = weather.wind.gust

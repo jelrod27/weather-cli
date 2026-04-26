@@ -4,108 +4,86 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
-### Development
+```bash
+npm install              # Install deps (Node >= 20 required)
+npm start                # Run CLI via bin/weather.js
+npm run dev              # Auto-restart with node --watch
+npm test                 # Vitest, single run (CI uses this)
+npm run test:watch       # Vitest watch
+npm run test:coverage    # With coverage
+npx vitest run tests/unit/cache.test.js   # Single test file
+npm run lint             # ESLint (flat config in eslint.config.js)
+npm run lint:fix
+npm run format           # Prettier write
+npm run format:check
+```
 
-- `npm install` - Install dependencies
-- `npm start` - Run the application using `node bin/weather.js`
-- `npm run dev` - Run in development mode with auto-restart using `node --watch bin/weather.js`
+A `pre-commit` Husky hook runs `lint-staged` (eslint --fix + prettier --write on staged JS).
 
-### Testing & Quality
+## Big-picture architecture
 
-- `npm test` - Run all unit tests (Vitest)
-- `npm run test:watch` - Run tests in watch mode
-- `npm run test:coverage` - Run tests with coverage report
-- `npm run lint` - Check for ESLint errors
-- `npm run lint:fix` - Auto-fix ESLint errors
-- `npm run format` - Format all files with Prettier
-- `npm run format:check` - Check formatting without writing
+### Entry points
 
-### Running the CLI
+- **`bin/weather.js`** is the published binary (`"bin": { "weather": "./bin/weather.js" }`). It is a thin wrapper that dynamically imports `../index.js` via `pathToFileURL` for cross-platform support. Any new top-level startup logic belongs in `index.js`, not `bin/weather.js`.
+- **`index.js`** wires up the `commander` program: top-level variadic `[location...]` action, plus subcommands (`now`, `forecast`, `5day`, `compare`, `coords`, `config`, `cache`, `interactive`/`i`). All commands flow through `withUnitOptions(withArtOptions(...))` helpers — when adding a new command, reuse those wrappers so unit and art flags stay consistent.
+- The default action with **no args** drops into `inquirer` interactive mode. With args, location words are joined and run through `parseLocation()`.
 
-#### Global Installation (Recommended)
+### Data source: Open-Meteo (src/api/openmeteo.js)
 
-After `npm install -g .`:
+Three endpoints per request:
 
-- `weather` - Interactive mode by default
-- `weather <location>` - Get current weather (flexible format)
-- `weather london` - Current weather for London
-- `weather "new york"` - Current weather for New York
-- `weather "san ramon, ca"` - Current weather with state
-- `weather forecast [location]` - Get 24-hour forecast
-- `weather 5day [location]` - Get 5-day forecast
-- `weather compare <city1> <city2>` - Compare weather between two cities
-- `weather coords <lat,lon>` - Get weather by GPS coordinates
-- `weather config` - Configure default settings
-- `weather cache` - View cache status
-- `weather cache -c` - Clear cache
-- `weather auth set` - Store API key securely
-- `weather auth test` - Test API key validity
+1. `geocoding-api.open-meteo.com/v1/search` — resolves a location string to `{ lat, lon, country, admin1, name }`. The country code (ISO 3166-1 alpha-2) is what drives unit auto-detect (`FAHRENHEIT_COUNTRIES` = US, BS, BZ, KY, PW).
+2. `api.open-meteo.com/v1/forecast` — current + hourly + daily blocks. We pass `temperature_unit=celsius|fahrenheit` and `wind_speed_unit=ms|mph` upfront so no client-side conversion is needed.
+3. `air-quality-api.open-meteo.com/v1/air-quality` — `current=us_aqi`. Failures are swallowed (AQ is non-essential).
 
-#### Local Development
+The forecast and AQ calls run in parallel via `Promise.all`. Geocoding must complete first (it determines lat/lon and the unit-detection country code). No API key is sent.
 
-- `node index.js` - Runs interactive mode by default
-- `node index.js london` - Get current weather for London
-- `node index.js now [location]` - Get current weather
-- `node index.js forecast [location]` - Get 24-hour forecast
-- `node index.js 5day [location]` - Get 5-day forecast
+### OWM-shape adapter
 
-### Common CLI Options
+`display.js` and `src/ascii/index.js` `SCENE_MAP` were originally written against OpenWeatherMap's response shape and condition codes. Rather than rewrite both, **`normalizeToOwmShape()` in `src/api/openmeteo.js` translates Open-Meteo responses into that exact shape** (`current.weather[0].id`, `current.main.temp`, `current.sys.country/sunrise/sunset`, `forecast.list[]`, `pollution.list[0].main.aqi`, etc.). Two helpers in `src/api/wmoToOwm.js` do the heavy lifting:
 
-- `-u metric|imperial` - Temperature units (default: metric)
-- `-f` - Include 24-hour forecast with current weather
-- `-a` - Show weather alerts
+- `wmoToOwm(wmoCode)` — WMO weather codes (0–99) → OWM-shape `{ id, main, description }` so existing `SCENE_MAP[id]` keeps resolving.
+- `usAqiToOwmAqi(usAqi)` — US-AQI 0–500 → OWM 1–5 by EPA breakpoints (≤50→1, ≤100→2, ≤150→3, ≤200→4, >200→5).
 
-## Architecture
+When extending the data we read from Open-Meteo, prefer to **add to the adapter** rather than touch `display.js`.
 
-### Module Structure
+### Coordinates mode
 
-The CLI entry point is `index.js`, with supporting modules in `src/`:
+Open-Meteo has no reverse-geocoding API. `getWeatherByCoords()` therefore labels the location as `"lat, lon"`, leaves `country` empty, and skips country-based unit auto-detect (defaults to celsius unless the user passed `--fahrenheit`/`-u`). Display falls back to a country-less header in this mode.
 
-- `src/weather.js` - Weather data fetching (shared `_fetchWeatherData` helper)
-- `src/display.js` - Terminal display formatting (boxen, chalk)
-- `src/config.js` - User configuration (load/save `.weather-config.json`)
-- `src/cache.js` - Response caching with LRU eviction
-- `src/api/http.js` - Axios HTTP client with retry and rate limit handling
-- `src/api/auth.js` - API key management (keytar + env fallback)
-- `src/utils/errors.js` - WeatherError class and exit code mapping
-- `src/utils/validators.js` - Input sanitization and validation
-- `src/utils/locationParser.js` - Smart location parsing (state/province codes, major cities)
+The cache key includes `userUnits || 'auto'`, so cached entries are unit-specific and the auto-detect path caches separately from explicit overrides.
 
-### Key Components
+### Errors and exit codes (src/utils/errors.js)
 
-- **Weather API Integration**: Uses OpenWeatherMap API for current weather, forecasts, and air pollution data
-- **Caching System**: Intelligent caching with 30-minute expiration stored in `.weather-cache.json`
-- **Configuration**: User settings stored in `.weather-config.json`
-- **Interactive Mode**: Uses `inquirer` for user-friendly prompts
-- **Display System**: Colored terminal output using `chalk` and `boxen`
+All thrown errors should be `WeatherError` with a code from `ERROR_CODES`. `mapErrorToExitCode()` maps codes to deterministic exit codes (3 = location, 4 = network, 5 = rate limit, 6 = invalid input, 1 = anything else). Exit code 2 (formerly auth) was retired in 0.4.0 along with the API-key code path. Tests and shell scripts depend on these — don't change them casually.
 
-### API Endpoints Used
+### HTTP layer (src/api/http.js)
 
-- `weather` - Current weather conditions
-- `forecast` - 5-day/3-hour forecast data
-- `air_pollution` - Air quality index for weather alerts
+Single shared `axios` instance with 5 s timeout, `User-Agent: weather-cli/<version>` (read from `package.json`), per-request `X-Request-ID` header, and `axios-retry` configured for 3 retries on network errors, 5xx, and 429 with exponential backoff. A response interceptor rewrites 429 messages to include `Retry-After`. Use this client (`./api/http.js` default export) for any new outbound HTTP — don't import `axios` directly.
 
-### Configuration Files
+### Cache (src/cache.js)
 
-- `.env` - Contains `WEATHER_API_KEY` (required for OpenWeatherMap API)
-- `.weather-config.json` - User preferences (default location, units)
-- `.weather-cache.json` - Cached API responses to reduce API calls
+JSON file at repo root: `.weather-cache.json`. 30-min entry expiry, 100-entry cap, 7-day hard max age, in-memory `accessOrder` array for LRU eviction. `accessOrder` is module-scoped so it's only meaningful within a single CLI invocation — across invocations LRU degrades to "first 100 surviving entries kept."
 
-### Dependencies
+Each cache entry carries a `schemaVersion` field. Bump `CACHE_SCHEMA_VERSION` in `src/cache.js` whenever the cached `data` shape changes — older entries are silently skipped on read. Current value: `2` (post-Open-Meteo cutover).
 
-- `axios` / `axios-retry` - HTTP requests with retry logic
-- `chalk` - Terminal text coloring
-- `boxen` - Terminal boxes for formatted output
-- `commander` - CLI command parsing
-- `dotenv` - Environment variable loading
-- `inquirer` - Interactive command-line prompts
-- `ora` - Loading spinners
-- `keytar` - Secure API key storage
+### ASCII art subsystem (src/ascii/)
 
-### Error Handling
+`getScene(conditionCode, weatherData)` maps OWM condition codes → scene modules in `src/ascii/scenes/`. Code 800 (clear) flips to `night-clear` based on `isDaytime()` (compares `dt` to `sys.sunrise`/`sys.sunset`). Rendered by `AsciiRenderer` from `display.js`. New conditions need to be added to `SCENE_MAP` in `src/ascii/index.js` or they fall back to `cloudy`.
 
-- API key validation with helpful error messages
-- Location not found (404) handling
-- Network error handling with graceful degradation
-- Coordinate validation for GPS input
-- Rate limit detection with retry-after support
+### Config (src/config.js)
+
+JSON file at repo root: `.weather-config.json`. Stores `defaultLocation`, `defaultUnits`, and `ascii: { enabled, style }`. `processTemperatureOptions()` is the single source of truth for resolving CLI flags into a unit string — call it instead of inspecting `options.celsius`/`options.fahrenheit`/`options.units` directly.
+
+## CI / publish flow
+
+- **`.github/workflows/ci.yml`** — lint + format check on Node 20, tests on Node 20/22/24.
+- **`.github/workflows/npm-publish.yml`** — on PR merge to `main`/`master`, compares `package.json` version to npm registry version. If they differ, runs tests and `npm publish`, then creates a GitHub release. **Bumping `package.json` version is therefore the trigger to publish.** Don't bump version in casual PRs.
+
+## Module conventions
+
+- **ESM only** (`"type": "module"`). Use `import`/`export`, no `require`.
+- Get `__dirname` via `dirname(fileURLToPath(import.meta.url))` — this pattern is reused across `index.js`, `cache.js`, `config.js`, and `http.js`.
+- Spinner pattern: create `ora('...').start()` inside the API call, `succeed`/`fail` it before returning/throwing.
+- Tests live in `tests/unit/*.test.js` (vitest config restricts to `tests/**/*.test.js`). `globals: true` is set, so `describe`/`it`/`expect` are available without import.
+- `tests/*.spec.js` files (`simple-weather-test.spec.js`, `weather-validation.spec.js`) are Playwright-style specs and **not** picked up by Vitest. There is a `playwright.config.{js,cjs}` but no `playwright` script in `package.json` — these aren't part of normal CI.

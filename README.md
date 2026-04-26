@@ -1,11 +1,13 @@
-# weather-cli-16bit
+# weather-cli-16bit v0.4.0
 
 [![npm version](https://badge.fury.io/js/weather-cli-16bit.svg)](https://www.npmjs.com/package/weather-cli-16bit)
 [![CI](https://github.com/deephouse23/weather-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/deephouse23/weather-cli/actions/workflows/ci.yml)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Node.js](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen)
 
-An OpenWeatherMap CLI that parses location words without quotes — `weather San Ramon CA` just works.
+An Open-Meteo CLI that parses location words without quotes — `weather San Ramon CA` just works.
+
+**No API key, no signup — powered by [Open-Meteo](https://open-meteo.com).**
 
 ## Install
 
@@ -13,16 +15,7 @@ An OpenWeatherMap CLI that parses location words without quotes — `weather San
 npm install -g weather-cli-16bit
 ```
 
-Requires Node.js 20+ and a free OpenWeatherMap API key.
-
-## Setup
-
-```bash
-weather auth set     # store API key in the OS keychain
-weather auth test    # verify it works
-```
-
-Or set `WEATHER_API_KEY` in `.env` / your shell.
+Requires Node.js 20+.
 
 ## Usage
 
@@ -98,7 +91,6 @@ Run `weather <location>` once to warm the cache. Subsequent `weather status` cal
 | `weather status [location]`       | One-line output for prompts / tmux |
 | `weather config`                  | Set default location and units     |
 | `weather cache [-c\|--clean]`     | View / clear / prune the cache     |
-| `weather auth set\|test`          | Store or validate the API key      |
 | `weather interactive` / `i`       | Force interactive prompts          |
 
 ## Options
@@ -133,7 +125,7 @@ npm run format       prettier --write .
 npm run dev          node --watch bin/weather.js
 ```
 
-Stack: Vitest, ESLint (flat config), Prettier, Husky + lint-staged, Axios, Commander, Inquirer, boxen, chalk. Keys live in the OS keychain via `@napi-rs/keyring`.
+Stack: Vitest, ESLint (flat config), Prettier, Husky + lint-staged, Axios, Commander, Inquirer, boxen, chalk.
 
 CI runs lint + the test suite on Node 20/22/24.
 
@@ -145,4 +137,4 @@ MIT — see [LICENSE](LICENSE).
 
 - npm: [weather-cli-16bit](https://www.npmjs.com/package/weather-cli-16bit)
 - Repo: [github.com/deephouse23/weather-cli](https://github.com/deephouse23/weather-cli)
-- API: [openweathermap.org](https://openweathermap.org/api)
+- API: [Open-Meteo](https://open-meteo.com) (free, no API key required)

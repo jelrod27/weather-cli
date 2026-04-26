@@ -22,7 +22,8 @@ describe('getCachedWeather', () => {
     const cachedData = {
       'London-auto': {
         data: { current: { temp: 20 } },
-        timestamp: Date.now() - 5 * 60 * 1000 // 5 minutes ago
+        timestamp: Date.now() - 5 * 60 * 1000, // 5 minutes ago
+        schemaVersion: 2
       }
     };
     fs.readFile.mockResolvedValue(JSON.stringify(cachedData));
@@ -35,7 +36,22 @@ describe('getCachedWeather', () => {
     const cachedData = {
       'London-auto': {
         data: { current: { temp: 20 } },
-        timestamp: Date.now() - 60 * 60 * 1000 // 1 hour ago (expired)
+        timestamp: Date.now() - 60 * 60 * 1000, // 1 hour ago (expired)
+        schemaVersion: 2
+      }
+    };
+    fs.readFile.mockResolvedValue(JSON.stringify(cachedData));
+
+    const result = await getCachedWeather('London', 'auto');
+    expect(result).toBeNull();
+  });
+
+  it('returns null for entries from an older schema version', async () => {
+    const cachedData = {
+      'London-auto': {
+        data: { current: { temp: 20 } },
+        timestamp: Date.now() - 5 * 60 * 1000
+        // no schemaVersion → pre-0.4 entry from OWM era
       }
     };
     fs.readFile.mockResolvedValue(JSON.stringify(cachedData));
@@ -64,7 +80,7 @@ describe('setCachedWeather', () => {
     vi.clearAllMocks();
   });
 
-  it('writes cache data to file', async () => {
+  it('writes cache data to file with current schema version', async () => {
     fs.readFile.mockResolvedValue('{}');
     fs.writeFile.mockResolvedValue();
 
@@ -74,6 +90,7 @@ describe('setCachedWeather', () => {
     const writtenData = JSON.parse(fs.writeFile.mock.calls[0][1]);
     expect(writtenData['London-auto']).toBeDefined();
     expect(writtenData['London-auto'].data).toEqual({ current: { temp: 20 } });
+    expect(writtenData['London-auto'].schemaVersion).toBe(2);
   });
 });
 
