@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   formatTemp,
   formatWindSpeed,
+  formatVisibility,
   formatTime,
   getAirQualityDescription,
   createDataRow
@@ -52,6 +53,34 @@ describe('formatWindSpeed', () => {
     const result = formatWindSpeed(10, 'fahrenheit', 'ms');
     // 10 m/s * 2.237 = 22.37 mph, toFixed(1) = "22.4 mph"
     expect(result).toBe('22.4 mph');
+  });
+
+  it('does NOT double-convert when API already returns mph (windUnit=mph, fahrenheit)', () => {
+    // This is the core bug scenario: Open-Meteo returns mph already when imperial
+    // is selected. formatWindSpeed must skip the m/s->mph conversion.
+    const result = formatWindSpeed(10, 'fahrenheit', 'mph');
+    expect(result).toBe('10.0 mph');
+  });
+
+  it('does NOT double-convert gust speed either (windUnit=mph)', () => {
+    const result = formatWindSpeed(25.3, 'fahrenheit', 'mph');
+    expect(result).toBe('25.3 mph');
+  });
+});
+
+describe('formatVisibility', () => {
+  it('formats meters as km for celsius display', () => {
+    expect(formatVisibility(10000, 'celsius')).toBe('10.0 km');
+  });
+
+  it('formats meters as miles for fahrenheit display', () => {
+    // 10000m / 1609.344 = 6.21371... miles
+    expect(formatVisibility(10000, 'fahrenheit')).toBe('6.2 mi');
+  });
+
+  it('formats low visibility correctly', () => {
+    expect(formatVisibility(2000, 'celsius')).toBe('2.0 km');
+    expect(formatVisibility(2000, 'fahrenheit')).toBe('1.2 mi');
   });
 });
 

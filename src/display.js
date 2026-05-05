@@ -26,12 +26,46 @@ function formatTime(timestamp) {
   });
 }
 
-function formatWindSpeed(speed, displayUnit) {
+function degToArrow(deg) {
+  // Normalize to 0-360
+  const d = ((deg % 360) + 360) % 360;
+  // 8 directions, each spanning 45°, centered on cardinal
+  const arrows = ['↑', '↗', '→', '↘', '↓', '↙', '←', '↖'];
+  const index = Math.round(d / 45) % 8;
+  return arrows[index];
+}
+
+function degToCardinal(deg) {
+  const d = ((deg % 360) + 360) % 360;
+  const cardinals = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+  const index = Math.round(d / 45) % 8;
+  return cardinals[index];
+}
+
+function formatWindDirection(deg) {
+  return `${degToArrow(deg)}${degToCardinal(deg)} (${deg}°)`;
+}
+
+function formatWindSpeed(speed, displayUnit, windUnit) {
+  if (windUnit === 'mph') {
+    // API already returned mph — no conversion needed
+    return `${speed.toFixed(1)} mph`;
+  }
   if (displayUnit === 'fahrenheit') {
+    // API returned m/s, convert to mph
     const mph = speed * 2.237;
     return `${mph.toFixed(1)} mph`;
   }
-  return `${speed} m/s`;
+  return `${speed.toFixed(1)} m/s`;
+}
+
+function formatVisibility(meters, displayUnit) {
+  if (displayUnit === 'fahrenheit') {
+    const miles = meters / 1609.344;
+    return `${miles.toFixed(1)} mi`;
+  }
+  const km = meters / 1000;
+  return `${km.toFixed(1)} km`;
 }
 
 function createDataRow(label, value, options = {}) {
@@ -78,6 +112,7 @@ function renderTwoColumnRows(leftCol, rightCol, leftWidth) {
 }
 
 function displayCurrentWeather(data, displayUnit, options = {}) {
+  const windUnit = data.windUnit || (displayUnit === 'fahrenheit' ? 'mph' : 'ms');
   const weather = data.current || data;
 
   if (!weather || !weather.weather || !weather.weather[0]) {
@@ -124,10 +159,10 @@ function displayCurrentWeather(data, displayUnit, options = {}) {
 
   const aqi = data.pollution?.list?.[0]?.main?.aqi;
   const windGust = weather.wind.gust
-    ? ` (gust ${formatWindSpeed(weather.wind.gust, displayUnit)})`
+    ? ` (gust ${formatWindSpeed(weather.wind.gust, displayUnit, windUnit)})`
     : '';
-  const wind = `${formatWindSpeed(weather.wind.speed, displayUnit)} @ ${weather.wind.deg}°${windGust}`;
-  const visKm = (weather.visibility / 1000).toFixed(1);
+  const wind = `${formatWindSpeed(weather.wind.speed, displayUnit, windUnit)} @ ${weather.wind.deg}°${windGust}`;
+  const visFormatted = formatVisibility(weather.visibility, displayUnit);
 
   const left = [
     chalk.gray(weather.weather[0].description),
@@ -143,7 +178,7 @@ function displayCurrentWeather(data, displayUnit, options = {}) {
     aqi ? `Air Quality: ${getAirQualityDescription(aqi)} (AQI: ${aqi})` : '',
     `Min/Max:     ${formatTemp(weather.main.temp_min, displayUnit, { colorCode: true, type: 'min' })} / ${formatTemp(weather.main.temp_max, displayUnit, { colorCode: true, type: 'max' })}`,
     `Wind:        ${wind}`,
-    `Visibility:  ${visKm} km`
+    `Visibility:  ${visFormatted}`
   ].filter(Boolean);
 
   let body;
@@ -248,6 +283,8 @@ function display24HourForecast(data, displayUnit) {
 
 export {
   formatTemp,
+  formatWindSpeed,
+  formatVisibility,
   formatTime,
   getAirQualityDescription,
   displayCurrentWeather,
