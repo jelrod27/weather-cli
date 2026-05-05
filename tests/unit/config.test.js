@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import fs from 'fs/promises';
 
-// Mock fs/promises to test config I/O
+// Mock fs/promises to test config I/O — must include mkdir, rename and unlink for atomic writes
 vi.mock('fs/promises', () => ({
   default: {
     mkdir: vi.fn().mockResolvedValue(undefined),
@@ -10,6 +10,11 @@ vi.mock('fs/promises', () => ({
     rename: vi.fn(),
     unlink: vi.fn()
   }
+}));
+
+// Mock crypto.randomUUID so atomic temp-file names are deterministic in tests
+vi.mock('crypto', () => ({
+  randomUUID: () => 'test-uuid'
 }));
 
 // Import after mocking
@@ -62,24 +67,38 @@ describe('loadConfig', () => {
   });
 });
 
-describe('saveConfig', () => {
+describe('saveConfig (atomic write)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('ensures config directory exists before writing', async () => {
-    fs.mkdir.mockResolvedValue(undefined);
+  it('writes to temp file then renames to target', async () => {
     fs.writeFile.mockResolvedValue();
+    fs.rename.mockResolvedValue();
 
     await saveConfig({ defaultLocation: 'Paris' });
 
-    expect(fs.mkdir).toHaveBeenCalledWith(expect.stringContaining('weather-cli'), {
-      recursive: true
-    });
+    // Should write to a temp file first
     expect(fs.writeFile).toHaveBeenCalledWith(
-      expect.stringContaining('config.json'),
+      expect.stringContaining('.tmp'),
       JSON.stringify({ defaultLocation: 'Paris' }, null, 2)
     );
+    // Then atomically rename to the real config file
+    expect(fs.rename).toHaveBeenCalledWith(
+      expect.stringContaining('.tmp'),
+      expect.stringContaining('config.json')
+    );
+  });
+
+  it('cleans up temp file if rename fails', async () => {
+    fs.writeFile.mockResolvedValue();
+    fs.rename.mockRejectedValue(new Error('rename failed'));
+    fs.unlink.mockResolvedValue();
+
+    await expect(saveConfig({ defaultLocation: 'Paris' })).rejects.toThrow('rename failed');
+
+    // Should attempt to clean up the temp file
+    expect(fs.unlink).toHaveBeenCalledWith(expect.stringContaining('.tmp'));
   });
 });
 
@@ -131,6 +150,7 @@ describe('setDefaultLocation', () => {
   it('sets default location while preserving other config', async () => {
     fs.readFile.mockResolvedValue(JSON.stringify({ defaultUnits: 'celsius' }));
     fs.writeFile.mockResolvedValue();
+    fs.rename.mockResolvedValue();
 
     await setDefaultLocation('Berlin');
 
@@ -149,6 +169,7 @@ describe('setDefaultUnits', () => {
   it('sets default units while preserving other config', async () => {
     fs.readFile.mockResolvedValue(JSON.stringify({ defaultLocation: 'London' }));
     fs.writeFile.mockResolvedValue();
+    fs.rename.mockResolvedValue();
 
     await setDefaultUnits('fahrenheit');
 
@@ -187,6 +208,7 @@ describe('setAsciiConfig', () => {
   it('merges ascii config with existing values', async () => {
     fs.readFile.mockResolvedValue(JSON.stringify({ ascii: { enabled: true, style: 'default' } }));
     fs.writeFile.mockResolvedValue();
+    fs.rename.mockResolvedValue();
 
     await setAsciiConfig({ style: 'retro' });
 
