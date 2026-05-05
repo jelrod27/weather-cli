@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   formatTemp,
+  formatWindSpeed,
   formatTime,
   getAirQualityDescription,
   createDataRow
@@ -26,6 +27,31 @@ describe('formatTemp', () => {
 
   it('handles zero', () => {
     expect(formatTemp(0, 'celsius')).toBe('0°C');
+  });
+});
+
+describe('formatWindSpeed', () => {
+  it('formats metric wind speed with 1 decimal place', () => {
+    expect(formatWindSpeed(3.7, 'celsius', 'ms')).toBe('3.7 m/s');
+  });
+
+  it('avoids floating point noise in metric display', () => {
+    // Value like 3.700000000000001 should render as "3.7 m/s"
+    expect(formatWindSpeed(3.700000000000001, 'celsius', 'ms')).toBe('3.7 m/s');
+  });
+
+  it('formats whole number metric wind speed with 1 decimal', () => {
+    expect(formatWindSpeed(5, 'celsius', 'ms')).toBe('5.0 m/s');
+  });
+
+  it('formats mph wind speed from API with 1 decimal', () => {
+    expect(formatWindSpeed(10.5, 'celsius', 'mph')).toBe('10.5 mph');
+  });
+
+  it('converts m/s to mph for fahrenheit display unit', () => {
+    const result = formatWindSpeed(10, 'fahrenheit', 'ms');
+    // 10 m/s * 2.237 = 22.37 mph, toFixed(1) = "22.4 mph"
+    expect(result).toBe('22.4 mph');
   });
 });
 
