@@ -203,4 +203,14 @@ describe('normalizeToOwmShape', () => {
     // Current time is 12:00, which matches index 4 → visibility 12000
     expect(data.current.visibility).toBe(12000);
   });
+
+  it('defaults windUnit to ms when not provided', () => {
+    const data = normalizeToOwmShape({ place, forecast, usAqi: null });
+    expect(data.windUnit).toBe('ms');
+  });
+
+  it('includes windUnit in the returned shape when provided', () => {
+    const data = normalizeToOwmShape({ place, forecast, usAqi: null, windUnit: 'mph' });
+    expect(data.windUnit).toBe('mph');
+  });
 });

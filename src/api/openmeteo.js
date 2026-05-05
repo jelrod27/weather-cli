@@ -169,7 +169,7 @@ function nearestHourlyIndex(times, refIso) {
 
 // Build OWM-shaped object from Open-Meteo responses + geocoding result.
 // Display layer reads this shape unchanged.
-export function normalizeToOwmShape({ place, forecast, usAqi }) {
+export function normalizeToOwmShape({ place, forecast, usAqi, windUnit = 'ms' }) {
   const cur = forecast.current || {};
   const hourly = forecast.hourly || {};
   const daily = forecast.daily || {};
@@ -238,6 +238,7 @@ export function normalizeToOwmShape({ place, forecast, usAqi }) {
       dt
     },
     forecast: { list },
-    pollution
+    pollution,
+    windUnit
   };
 }
