@@ -1,6 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import fs from 'fs/promises';
-import path from 'path';
 
 // Mock fs/promises — must include mkdir, rename and unlink for atomic writes
 vi.mock('fs/promises', () => ({
@@ -27,18 +26,15 @@ const {
   getCacheStats,
   clearCache,
   saveCache,
-  loadCache
+  loadCache,
+  __resetForTesting
 } = cacheModule;
 
 // Reset module-level _cacheDirEnsured flag between tests so ensureCacheDir
 // re-runs and picks up fresh mock state.
-function resetCacheDirFlag() {
-  // Access the module's internal state via re-import is not possible,
-  // so we use a workaround: set XDG_CACHE_HOME to force a fresh path,
-  // which makes ensureCacheDir call mkdir again anyway.
-  // Actually, the simplest fix is to just mock mkdir to resolve.
-  // The flag is a module-level let — tests that call ensureCacheDir need mkdir mocked.
-}
+afterEach(() => {
+  __resetForTesting();
+});
 
 describe('loadCache', () => {
   beforeEach(() => {
