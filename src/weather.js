@@ -75,7 +75,7 @@ async function fetchAndNormalize(place, userUnits, locationLabel) {
       fetchAirQuality(place.lat, place.lon)
     ]);
 
-    const data = normalizeToOwmShape({ place, forecast, usAqi });
+    const data = normalizeToOwmShape({ place, forecast, usAqi, windUnit: omUnits.windUnit });
     return {
       ...data,
       displayUnit: unitSystem.display,

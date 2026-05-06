@@ -41,6 +41,40 @@ describe('parseLocationQuery', () => {
       admin1: null
     });
   });
+
+  it('aliases USA to US', () => {
+    expect(parseLocationQuery('New York, USA')).toEqual({
+      name: 'New York',
+      country: 'US',
+      admin1: null
+    });
+  });
+
+  it('aliases UAE to AE', () => {
+    expect(parseLocationQuery('Dubai, UAE')).toEqual({
+      name: 'Dubai',
+      country: 'AE',
+      admin1: null
+    });
+  });
+
+  it('aliases 3-letter informal codes to ISO alpha-2', () => {
+    expect(parseLocationQuery('Ottawa, CAN')).toEqual({
+      name: 'Ottawa',
+      country: 'CA',
+      admin1: null
+    });
+    expect(parseLocationQuery('Sydney, AUS')).toEqual({
+      name: 'Sydney',
+      country: 'AU',
+      admin1: null
+    });
+    expect(parseLocationQuery('Seoul, KOR')).toEqual({
+      name: 'Seoul',
+      country: 'KR',
+      admin1: null
+    });
+  });
 });
 
 describe('normalizeToOwmShape', () => {
@@ -168,5 +202,15 @@ describe('normalizeToOwmShape', () => {
     const data = normalizeToOwmShape({ place, forecast, usAqi: null });
     // Current time is 12:00, which matches index 4 → visibility 12000
     expect(data.current.visibility).toBe(12000);
+  });
+
+  it('defaults windUnit to ms when not provided', () => {
+    const data = normalizeToOwmShape({ place, forecast, usAqi: null });
+    expect(data.windUnit).toBe('ms');
+  });
+
+  it('includes windUnit in the returned shape when provided', () => {
+    const data = normalizeToOwmShape({ place, forecast, usAqi: null, windUnit: 'mph' });
+    expect(data.windUnit).toBe('mph');
   });
 });

@@ -1,15 +1,26 @@
 import fs from 'fs/promises';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
+import { randomUUID } from 'crypto';
+import { join } from 'path';
+import { homedir } from 'os';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+const XDG_CONFIG_HOME = process.env.XDG_CONFIG_HOME || join(homedir(), '.config');
+const CONFIG_DIR = join(XDG_CONFIG_HOME, 'weather-cli');
+const CONFIG_FILE = join(CONFIG_DIR, 'config.json');
 
-const CONFIG_FILE = join(__dirname, '..', '.weather-config.json');
+// Ensure the config directory exists before any file I/O.
+// Called lazily on first read/write so we don't create dirs for mere imports.
+let _configDirEnsured = false;
+async function ensureConfigDir() {
+  if (!_configDirEnsured) {
+    await fs.mkdir(CONFIG_DIR, { recursive: true });
+    _configDirEnsured = true;
+  }
+}
 
 // Load saved configuration
 async function loadConfig() {
   try {
+    await ensureConfigDir();
     const data = await fs.readFile(CONFIG_FILE, 'utf8');
     return JSON.parse(data);
   } catch {
@@ -17,9 +28,25 @@ async function loadConfig() {
   }
 }
 
-// Save configuration
+// Atomically save configuration to file.
+// Writes to a temp file first, then renames (atomic on POSIX) to the target.
+// This prevents concurrent processes from reading a half-written file and
+// avoids the TOCTOU race where two CLI invocations overwrite each other's data.
 async function saveConfig(config) {
-  await fs.writeFile(CONFIG_FILE, JSON.stringify(config, null, 2));
+  await ensureConfigDir();
+  const tmpFile = `${CONFIG_FILE}.${randomUUID()}.tmp`;
+  try {
+    await fs.writeFile(tmpFile, JSON.stringify(config, null, 2));
+    await fs.rename(tmpFile, CONFIG_FILE);
+  } catch (err) {
+    // Clean up the temp file if rename fails
+    try {
+      await fs.unlink(tmpFile);
+    } catch {
+      // Ignore cleanup errors
+    }
+    throw err;
+  }
 }
 
 // Get default location
@@ -69,6 +96,11 @@ async function setAsciiConfig(asciiConfig) {
   await saveConfig(config);
 }
 
+// Reset internal state between tests. Not for production use.
+function __resetForTesting() {
+  _configDirEnsured = false;
+}
+
 export {
   loadConfig,
   saveConfig,
@@ -78,5 +110,6 @@ export {
   setDefaultUnits,
   processTemperatureOptions,
   getAsciiConfig,
-  setAsciiConfig
+  setAsciiConfig,
+  __resetForTesting
 };

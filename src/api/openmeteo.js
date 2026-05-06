@@ -7,7 +7,33 @@ const FORECAST_URL = 'https://api.open-meteo.com/v1/forecast';
 const AIR_QUALITY_URL = 'https://air-quality-api.open-meteo.com/v1/air-quality';
 
 // Common informal aliases → ISO 3166-1 alpha-2 (Open-Meteo returns ISO codes)
-const COUNTRY_ALIASES = { UK: 'GB' };
+const COUNTRY_ALIASES = {
+  UK: 'GB',
+  USA: 'US',
+  UAE: 'AE',
+  // Other common 3-letter informal codes
+  CAN: 'CA',
+  AUS: 'AU',
+  BRA: 'BR',
+  CHN: 'CN',
+  IND: 'IN',
+  JPN: 'JP',
+  KOR: 'KR',
+  RUS: 'RU',
+  DEU: 'DE',
+  FRA: 'FR',
+  ITA: 'IT',
+  ESP: 'ES',
+  MEX: 'MX',
+  ZAF: 'ZA',
+  ARG: 'AR',
+  NLD: 'NL',
+  POL: 'PL',
+  TUR: 'TR',
+  SAU: 'SA',
+  SGP: 'SG',
+  HKG: 'HK'
+};
 
 export function parseLocationQuery(input) {
   const parts = input
@@ -143,7 +169,7 @@ function nearestHourlyIndex(times, refIso) {
 
 // Build OWM-shaped object from Open-Meteo responses + geocoding result.
 // Display layer reads this shape unchanged.
-export function normalizeToOwmShape({ place, forecast, usAqi }) {
+export function normalizeToOwmShape({ place, forecast, usAqi, windUnit = 'ms' }) {
   const cur = forecast.current || {};
   const hourly = forecast.hourly || {};
   const daily = forecast.daily || {};
@@ -212,6 +238,7 @@ export function normalizeToOwmShape({ place, forecast, usAqi }) {
       dt
     },
     forecast: { list },
-    pollution
+    pollution,
+    windUnit
   };
 }
