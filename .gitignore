@@ -1,6 +1,11 @@
 
-# Environment variables - NEVER COMMIT THESE
+# Environment variables and secrets - NEVER COMMIT THESE
 .env
+.env.*
+*.pem
+*.key
+id_rsa*
+
 .env.local
 .env.*.local
 .env.test
@@ -48,6 +53,8 @@ coverage/
 .yarn-integrity
 
 # Build outputs
+dist/
+build/
 .next
 .nuxt
 .vuepress/dist
@@ -84,4 +91,3 @@ playwright-report/
 test-results/
 
 # Misc
-Inpower/

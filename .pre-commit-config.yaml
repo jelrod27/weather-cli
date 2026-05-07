@@ -1,0 +1,33 @@
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+        name: gitleaks (secret scan)
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: ['--maxkb=500']
+
+  - repo: local
+    hooks:
+      - id: eslint
+        name: eslint
+        entry: npx eslint
+        language: system
+        files: '\.js$'
+        pass_filenames: true
+        args: ['--quiet']
+
+      - id: prettier
+        name: prettier
+        entry: npx prettier
+        language: system
+        files: '\.(js|json|md)$'
+        pass_filenames: true
+        args: ['--check']
