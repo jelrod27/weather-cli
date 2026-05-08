@@ -1,12 +1,7 @@
 import fs from 'fs/promises';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
+import { ensureParentDir, getCacheFile } from './utils/paths.js';
 import { WeatherError, ERROR_CODES } from './utils/errors.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-const CACHE_FILE = join(__dirname, '..', '.weather-cache.json');
 const CACHE_EXPIRY = 30 * 60 * 1000; // 30 minutes
 const MAX_CACHE_SIZE = 100; // Maximum number of entries
 const MAX_CACHE_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days
@@ -17,7 +12,7 @@ const accessOrder = [];
 // Load cache from file
 async function loadCache() {
   try {
-    const data = await fs.readFile(CACHE_FILE, 'utf8');
+    const data = await fs.readFile(getCacheFile(), 'utf8');
     return JSON.parse(data);
   } catch {
     return {};
@@ -26,8 +21,10 @@ async function loadCache() {
 
 // Save cache to file
 async function saveCache(cache) {
+  const file = getCacheFile();
   try {
-    await fs.writeFile(CACHE_FILE, JSON.stringify(cache, null, 2));
+    await ensureParentDir(file);
+    await fs.writeFile(file, JSON.stringify(cache, null, 2));
   } catch (error) {
     throw new WeatherError('Failed to save cache', ERROR_CODES.CACHE_ERROR);
   }
@@ -149,7 +146,9 @@ async function getCacheStats() {
 
 // Clear all cache
 async function clearCache() {
-  await fs.writeFile(CACHE_FILE, '{}');
+  const file = getCacheFile();
+  await ensureParentDir(file);
+  await fs.writeFile(file, '{}');
 }
 
 export {

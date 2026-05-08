@@ -32,6 +32,7 @@ import {
 import { WeatherError, mapErrorToExitCode } from './src/utils/errors.js';
 import { setApiKey, testApiKey } from './src/api/auth.js';
 import { parseLocation } from './src/utils/locationParser.js';
+import { migrateLegacyFiles } from './src/utils/paths.js';
 import { runStatus } from './src/commands/status.js';
 
 dotenv.config({ quiet: true });
@@ -388,5 +389,7 @@ program
   .alias('i')
   .description('Interactive mode with prompts')
   .action(interactiveMode);
+
+await migrateLegacyFiles().catch(() => {});
 
 program.parseAsync().catch(handleError);

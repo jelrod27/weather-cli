@@ -5,7 +5,8 @@ import fs from 'fs/promises';
 vi.mock('fs/promises', () => ({
   default: {
     readFile: vi.fn(),
-    writeFile: vi.fn()
+    writeFile: vi.fn(),
+    mkdir: vi.fn().mockResolvedValue(undefined)
   }
 }));
 

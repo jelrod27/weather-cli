@@ -1,16 +1,10 @@
 import fs from 'fs/promises';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-const CONFIG_FILE = join(__dirname, '..', '.weather-config.json');
+import { ensureParentDir, getConfigFile } from './utils/paths.js';
 
 // Load saved configuration
 async function loadConfig() {
   try {
-    const data = await fs.readFile(CONFIG_FILE, 'utf8');
+    const data = await fs.readFile(getConfigFile(), 'utf8');
     return JSON.parse(data);
   } catch {
     return {};
@@ -19,7 +13,9 @@ async function loadConfig() {
 
 // Save configuration
 async function saveConfig(config) {
-  await fs.writeFile(CONFIG_FILE, JSON.stringify(config, null, 2));
+  const file = getConfigFile();
+  await ensureParentDir(file);
+  await fs.writeFile(file, JSON.stringify(config, null, 2));
 }
 
 // Get default location
