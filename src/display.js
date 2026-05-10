@@ -2,6 +2,7 @@ import chalk from 'chalk';
 import boxen from 'boxen';
 import { getScene, isDaytime } from './ascii/index.js';
 import { AsciiRenderer } from './ascii/renderer.js';
+import { renderBrailleLineChart, dataPointColumns, buildLabelRow } from './ascii/sparkline.js';
 import { weatherEmojis } from './utils/icons.js';
 
 function formatTemp(temp, displayUnit, options = {}) {
@@ -257,28 +258,107 @@ function display5DayForecast(data, displayUnit) {
   );
 }
 
+// Render the 24-hour forecast as a braille line chart with an emoji band
+// and time axis underneath. Falls back to a list view on terminals too narrow
+// to fit the chart cleanly (or when there isn't enough data to interpolate).
 function display24HourForecast(data, displayUnit) {
   const next24Hours = data.forecast.list.slice(0, 8);
+  if (next24Hours.length < 2) return; // nothing meaningful to chart
 
-  const forecastLines = next24Hours.map((item) => {
-    const time = new Date(item.dt * 1000).toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      hour12: true
-    });
-    const emoji = weatherEmojis[item.weather[0].main] || '🌤️';
-    const temp = formatTemp(item.main.temp, displayUnit);
+  const termWidth = getTerminalWidth();
+  const boxWidth = Math.min(termWidth - 2, 88);
+  const innerWidth = boxWidth - 4; // accounts for boxen padding (left+right=2) + borders (1+1)
 
-    return `${time.padEnd(6)} ${emoji} ${temp.padEnd(6)} ${chalk.gray(item.weather[0].description)}`;
-  });
+  const renderedSpark = renderSparklineBlock(next24Hours, displayUnit, innerWidth);
+  const content = renderedSpark || renderForecastList(next24Hours, displayUnit);
 
   console.log(
-    boxen(forecastLines.join('\n'), {
+    boxen(content, {
+      title: chalk.bold('24-hour forecast'),
+      titleAlignment: 'left',
       padding: { top: 0, bottom: 0, left: 1, right: 1 },
       margin: 0,
       borderStyle: 'round',
-      borderColor: 'blue'
+      borderColor: 'blue',
+      width: boxWidth
     })
   );
+}
+
+function renderSparklineBlock(items, displayUnit, innerWidth) {
+  const temps = items.map((item) => item.main.temp);
+  const emojis = items.map((item) => weatherEmojis[item.weather[0].main] || '🌤️');
+  const times = items.map(
+    (item) =>
+      new Date(item.dt * 1000)
+        .toLocaleTimeString('en-US', { hour: 'numeric', hour12: true })
+        .replace(/\s/g, '')
+        .toLowerCase()
+        .replace(/m$/, '') // "12pm" → "12p", "9am" → "9a"
+  );
+
+  // Gutter on the left holds hi/lo °labels (e.g. "82°F  ").
+  const gutterText = '999°F  '; // worst-case width
+  const gutter = gutterText.length;
+
+  // 4 cells per data point is the readability floor (3-char time + 1 space).
+  const minStep = 4;
+  const maxStep = 10;
+  const availableForChart = innerWidth - gutter;
+  const stepFromAvail = Math.floor(availableForChart / items.length);
+  if (stepFromAvail < minStep) return null;
+
+  const step = Math.min(maxStep, stepFromAvail);
+  const chartWidth = step * (items.length - 1) + 1;
+  const chartHeight = 4;
+
+  const chart = renderBrailleLineChart(temps, { width: chartWidth, height: chartHeight });
+  if (!chart) return null;
+
+  const lines = chart.split('\n');
+  const hi = Math.max(...temps);
+  const lo = Math.min(...temps);
+  const hiLabel = formatTemp(hi, displayUnit, { colorCode: true, type: 'max' });
+  const loLabel = formatTemp(lo, displayUnit, { colorCode: true, type: 'min' });
+
+  // Top row gets the hi label, bottom row gets the lo label, others get pure padding.
+  const chartRows = lines.map((line, i) => {
+    let label = '';
+    if (i === 0) label = hiLabel;
+    else if (i === lines.length - 1) label = loLabel;
+    return padVisible(label, gutter) + chalk.cyan(line);
+  });
+
+  const cols = dataPointColumns(items.length, chartWidth);
+  // Treat each weather emoji as 2 cells (variation-selector emoji width is
+  // terminal-dependent but 2 is the dominant default in modern emulators).
+  const emojiRow =
+    ' '.repeat(gutter) + buildLabelRow(emojis, cols, new Array(items.length).fill(2));
+  const timeRow =
+    ' '.repeat(gutter) +
+    chalk.gray(
+      buildLabelRow(
+        times,
+        cols,
+        times.map((t) => t.length)
+      )
+    );
+
+  return [...chartRows, emojiRow, timeRow].join('\n');
+}
+
+function renderForecastList(items, displayUnit) {
+  return items
+    .map((item) => {
+      const time = new Date(item.dt * 1000).toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        hour12: true
+      });
+      const emoji = weatherEmojis[item.weather[0].main] || '🌤️';
+      const temp = formatTemp(item.main.temp, displayUnit);
+      return `${time.padEnd(6)} ${emoji} ${temp.padEnd(6)} ${chalk.gray(item.weather[0].description)}`;
+    })
+    .join('\n');
 }
 
 export {
