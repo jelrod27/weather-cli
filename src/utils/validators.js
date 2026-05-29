@@ -1,7 +1,17 @@
 import { WeatherError, ERROR_CODES } from './errors.js';
 
-const UNSAFE_CHARS_REGEX = /[<>'"{}|\\\^`]/g;
+const UNSAFE_CHARS_REGEX = /[<>'"{}|\\^`]/g;
+const ANSI_ESCAPE_REGEX = /\x1b\[[0-9;]*[a-zA-Z]/g;
 const MAX_LOCATION_LENGTH = 100;
+
+export function sanitizeForDisplay(str) {
+  if (typeof str !== 'string') return String(str);
+  return str
+    .replace(ANSI_ESCAPE_REGEX, '')
+    .replace(UNSAFE_CHARS_REGEX, '')
+    .trim()
+    .slice(0, MAX_LOCATION_LENGTH);
+}
 
 export function sanitizeLocation(location) {
   if (typeof location !== 'string') {

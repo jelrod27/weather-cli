@@ -1,5 +1,6 @@
 import httpClient from './http.js';
 import { WeatherError, ERROR_CODES } from '../utils/errors.js';
+import { sanitizeForDisplay } from '../utils/validators.js';
 import { wmoToOwm, usAqiToOwmAqi } from './wmoToOwm.js';
 
 const GEOCODING_URL = 'https://geocoding-api.open-meteo.com/v1/search';
@@ -68,7 +69,7 @@ export async function geocode(input) {
   const results = res.data?.results || [];
   if (results.length === 0) {
     throw new WeatherError(
-      `Location "${input}" not found. Please check the spelling or try: "City, Country Code" (e.g., "San Ramon, US")`,
+      `Location "${sanitizeForDisplay(input)}" not found. Please check the spelling or try: "City, Country Code" (e.g., "San Ramon, US")`,
       ERROR_CODES.LOCATION_NOT_FOUND,
       404
     );
