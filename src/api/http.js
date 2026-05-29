@@ -10,6 +10,9 @@ const packageJson = JSON.parse(readFileSync(join(__dirname, '..', '..', 'package
 
 const httpClient = axios.create({
   timeout: 5000,
+  maxRedirects: 0,
+  maxContentLength: 1024 * 1024,
+  maxBodyLength: 1024 * 1024,
   headers: {
     'User-Agent': `weather-cli/${packageJson.version}`
   }

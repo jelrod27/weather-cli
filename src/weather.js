@@ -1,6 +1,6 @@
 import ora from 'ora';
 import { WeatherError, ERROR_CODES } from './utils/errors.js';
-import { validateLocation, validateCoordinates } from './utils/validators.js';
+import { validateLocation, validateCoordinates, sanitizeForDisplay } from './utils/validators.js';
 import { geocode, fetchForecast, fetchAirQuality, normalizeToOwmShape } from './api/openmeteo.js';
 
 // Regional temperature units mapping (US + a handful of US-aligned territories)
@@ -47,11 +47,12 @@ function unitsForOpenMeteo(unitSystem) {
 }
 
 function rethrow(error, locationLabel) {
+  const safeLabel = sanitizeForDisplay(locationLabel);
   if (error instanceof WeatherError) return error;
 
   if (error.response?.status === 404) {
     return new WeatherError(
-      `Location "${locationLabel}" not found. Please check the spelling or try: "City, Country Code" (e.g., "San Ramon, US")`,
+      `Location "${safeLabel}" not found. Please check the spelling or try: "City, Country Code" (e.g., "San Ramon, US")`,
       ERROR_CODES.LOCATION_NOT_FOUND,
       404
     );
