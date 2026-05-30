@@ -27,26 +27,6 @@ function formatTime(timestamp) {
   });
 }
 
-function degToArrow(deg) {
-  // Normalize to 0-360
-  const d = ((deg % 360) + 360) % 360;
-  // 8 directions, each spanning 45°, centered on cardinal
-  const arrows = ['↑', '↗', '→', '↘', '↓', '↙', '←', '↖'];
-  const index = Math.round(d / 45) % 8;
-  return arrows[index];
-}
-
-function degToCardinal(deg) {
-  const d = ((deg % 360) + 360) % 360;
-  const cardinals = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
-  const index = Math.round(d / 45) % 8;
-  return cardinals[index];
-}
-
-function formatWindDirection(deg) {
-  return `${degToArrow(deg)}${degToCardinal(deg)} (${deg}°)`;
-}
-
 function formatWindSpeed(speed, displayUnit, windUnit) {
   if (windUnit === 'mph') {
     // API already returned mph — no conversion needed

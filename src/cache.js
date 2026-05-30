@@ -44,7 +44,7 @@ async function saveCache(cache) {
   try {
     await fs.writeFile(tmpFile, JSON.stringify(cache, null, 2));
     await fs.rename(tmpFile, CACHE_FILE);
-  } catch (err) {
+  } catch {
     // Clean up the temp file if rename fails
     try {
       await fs.unlink(tmpFile);

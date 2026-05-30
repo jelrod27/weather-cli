@@ -27,7 +27,6 @@ const {
   setDefaultLocation,
   setDefaultUnits,
   getAsciiConfig,
-  setAsciiConfig,
   processTemperatureOptions,
   __resetForTesting
 } = configModule;
@@ -197,24 +196,6 @@ describe('getAsciiConfig', () => {
 
     const result = await getAsciiConfig();
     expect(result).toEqual({ enabled: false, style: 'default' });
-  });
-});
-
-describe('setAsciiConfig', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('merges ascii config with existing values', async () => {
-    fs.readFile.mockResolvedValue(JSON.stringify({ ascii: { enabled: true, style: 'default' } }));
-    fs.writeFile.mockResolvedValue();
-    fs.rename.mockResolvedValue();
-
-    await setAsciiConfig({ style: 'retro' });
-
-    const writtenContent = fs.writeFile.mock.calls[0][1];
-    const parsed = JSON.parse(writtenContent);
-    expect(parsed.ascii).toEqual({ enabled: true, style: 'retro' });
   });
 });
 
