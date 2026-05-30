@@ -90,12 +90,6 @@ async function getAsciiConfig() {
   return config.ascii || { enabled: false, style: 'default' };
 }
 
-async function setAsciiConfig(asciiConfig) {
-  const config = await loadConfig();
-  config.ascii = { ...(config.ascii || {}), ...asciiConfig };
-  await saveConfig(config);
-}
-
 // Reset internal state between tests. Not for production use.
 function __resetForTesting() {
   _configDirEnsured = false;
@@ -110,6 +104,5 @@ export {
   setDefaultUnits,
   processTemperatureOptions,
   getAsciiConfig,
-  setAsciiConfig,
   __resetForTesting
 };
