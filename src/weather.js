@@ -1,7 +1,13 @@
 import ora from 'ora';
 import { WeatherError, ERROR_CODES } from './utils/errors.js';
 import { validateLocation, validateCoordinates, sanitizeForDisplay } from './utils/validators.js';
-import { geocode, fetchForecast, fetchAirQuality, normalizeToOwmShape } from './api/openmeteo.js';
+import {
+  geocode,
+  fetchForecast,
+  fetchAirQuality,
+  normalizeToOwmShape,
+  getAlerts
+} from './api/openmeteo.js';
 
 // Regional temperature units mapping (US + a handful of US-aligned territories)
 const FAHRENHEIT_COUNTRIES = new Set(['US', 'USA', 'BS', 'BZ', 'KY', 'PW']);
@@ -66,17 +72,29 @@ function rethrow(error, locationLabel) {
   return new WeatherError(`Network error: ${error.message}`, ERROR_CODES.NETWORK_ERROR);
 }
 
-async function fetchAndNormalize(place, userUnits, locationLabel) {
+async function fetchAndNormalize(
+  place,
+  userUnits,
+  locationLabel,
+  { includeMinutely = false } = {}
+) {
   const unitSystem = determineDisplayUnits(place.country, userUnits);
   const omUnits = unitsForOpenMeteo(unitSystem);
 
   try {
-    const [forecast, usAqi] = await Promise.all([
-      fetchForecast(place.lat, place.lon, omUnits),
-      fetchAirQuality(place.lat, place.lon)
+    const [forecast, usAqi, alerts] = await Promise.all([
+      fetchForecast(place.lat, place.lon, { ...omUnits, includeMinutely }),
+      fetchAirQuality(place.lat, place.lon),
+      getAlerts(place.lat, place.lon, place.country)
     ]);
 
-    const data = normalizeToOwmShape({ place, forecast, usAqi, windUnit: omUnits.windUnit });
+    const data = normalizeToOwmShape({
+      place,
+      forecast,
+      airQuality: usAqi,
+      windUnit: omUnits.windUnit,
+      alerts
+    });
     return {
       ...data,
       displayUnit: unitSystem.display,
@@ -87,13 +105,15 @@ async function fetchAndNormalize(place, userUnits, locationLabel) {
   }
 }
 
-async function getWeather(location, userUnits = null) {
+async function getWeather(location, userUnits = null, options = {}) {
   const validated = validateLocation(location);
   const spinner = ora('Fetching weather data...').start();
 
   try {
     const place = await geocode(validated);
-    const result = await fetchAndNormalize(place, userUnits, location);
+    const result = await fetchAndNormalize(place, userUnits, location, {
+      includeMinutely: options.includeMinutely ?? false
+    });
     spinner.succeed(
       `Weather data fetched! Using ${result.displayUnit === 'fahrenheit' ? 'Fahrenheit' : 'Celsius'}${
         place.country ? ` for ${place.country}` : ''
@@ -106,7 +126,7 @@ async function getWeather(location, userUnits = null) {
   }
 }
 
-async function getWeatherByCoords(lat, lon, userUnits = null) {
+async function getWeatherByCoords(lat, lon, userUnits = null, options = {}) {
   const { latitude, longitude } = validateCoordinates(lat, lon);
   const spinner = ora('Fetching weather data...').start();
 
@@ -121,7 +141,9 @@ async function getWeatherByCoords(lat, lon, userUnits = null) {
   };
 
   try {
-    const result = await fetchAndNormalize(place, userUnits, `${lat},${lon}`);
+    const result = await fetchAndNormalize(place, userUnits, `${lat},${lon}`, {
+      includeMinutely: options.includeMinutely ?? false
+    });
     spinner.succeed(
       `Weather data fetched! Using ${result.displayUnit === 'fahrenheit' ? 'Fahrenheit' : 'Celsius'}`
     );

@@ -27,6 +27,43 @@ function formatTime(timestamp) {
   });
 }
 
+/**
+ * Convert wind degrees to a cardinal direction.
+ * @param {number} deg - Wind direction in degrees
+ * @returns {string} Cardinal direction (N, NE, E, SE, S, SW, W, NW)
+ */
+function degToCardinal(deg) {
+  const d = ((deg % 360) + 360) % 360;
+  const cardinals = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+  const index = Math.round(d / 45) % 8;
+  return cardinals[index];
+}
+
+/**
+ * Return a short relative-time string like "in 3h 22m", "in 45m", "22m ago".
+ * @param {number} timestamp - Unix timestamp in seconds
+ * @returns {string}
+ */
+function formatRelativeTime(timestamp) {
+  const nowSec = Math.floor(Date.now() / 1000);
+  const diff = timestamp - nowSec;
+  // Treat tiny negative diffs (timing noise) as zero
+  const absDiff = Math.abs(diff < 0 && diff > -60 ? 0 : diff);
+
+  const hours = Math.floor(absDiff / 3600);
+  const mins = Math.floor((absDiff % 3600) / 60);
+
+  const parts = [];
+  if (hours > 0) parts.push(`${hours}h`);
+  if (mins > 0 || hours === 0) parts.push(`${mins}m`);
+
+  const relStr = parts.join(' ');
+  if (diff >= 0 || (diff < 0 && diff > -60)) {
+    return `in ${relStr}`;
+  }
+  return `${relStr} ago`;
+}
+
 function formatWindSpeed(speed, displayUnit, windUnit) {
   if (windUnit === 'mph') {
     // API already returned mph — no conversion needed
@@ -67,6 +104,21 @@ function getAirQualityDescription(aqi) {
   return desc.color(desc.text);
 }
 
+/** Return the most frequent value in an array of numbers. */
+function modeValue(arr) {
+  const counts = {};
+  let maxCount = 0;
+  let result = arr[0];
+  for (const v of arr) {
+    counts[v] = (counts[v] || 0) + 1;
+    if (counts[v] > maxCount) {
+      maxCount = counts[v];
+      result = v;
+    }
+  }
+  return result;
+}
+
 function getTerminalWidth() {
   return process.stdout.columns || 80;
 }
@@ -92,6 +144,84 @@ function renderTwoColumnRows(leftCol, rightCol, leftWidth) {
   return rows.join('\n');
 }
 
+/**
+ * Map severity to chalk color function.
+ */
+function severityColor(severity) {
+  switch (severity) {
+    case 'Extreme':
+      return chalk.red.bold;
+    case 'Severe':
+      return chalk.red;
+    case 'Moderate':
+      return chalk.yellow;
+    case 'Minor':
+      return chalk.yellow.dim;
+    default:
+      return chalk.white;
+  }
+}
+
+/**
+ * Map severity to boxen border color.
+ */
+function severityBorderColor(severity) {
+  switch (severity) {
+    case 'Extreme':
+    case 'Severe':
+      return 'red';
+    case 'Moderate':
+      return 'yellow';
+    default:
+      return 'gray';
+  }
+}
+
+/**
+ * Render weather alerts as a string of bordered boxes.
+ * Shows each alert as: ⚠️ HEADLINE [SEVERITY] with the description snippet.
+ *
+ * @param {Array} alerts - Array of normalized alert objects
+ * @returns {string} Formatted alerts string, or empty string if no alerts
+ */
+function displayAlerts(alerts) {
+  if (!alerts || alerts.length === 0) return '';
+
+  const termWidth = process.stdout.columns || 80;
+  const boxWidth = Math.min(termWidth - 2, 88);
+  const parts = [];
+
+  for (const alert of alerts) {
+    const color = severityColor(alert.severity);
+    const borderColor = severityBorderColor(alert.severity);
+
+    const header = color(`⚠️  ${alert.headline}`);
+    const urgency = `Urgency: ${alert.urgency}`;
+    const severity = `Severity: ${alert.severity}`;
+    const meta = `${severity}  |  ${urgency}`;
+    const desc = alert.description ? chalk.gray(alert.description) : '';
+
+    const lines = [header, '', meta];
+    if (desc) {
+      lines.push('', desc);
+    }
+
+    const content = lines.join('\n');
+
+    parts.push(
+      boxen(content, {
+        padding: { top: 0, bottom: 0, left: 1, right: 1 },
+        margin: { top: 0, bottom: 0, left: 0, right: 0 },
+        borderStyle: 'bold',
+        borderColor,
+        width: boxWidth
+      })
+    );
+  }
+
+  return parts.join('\n');
+}
+
 function displayCurrentWeather(data, displayUnit, options = {}) {
   const windUnit = data.windUnit || (displayUnit === 'fahrenheit' ? 'mph' : 'ms');
   const weather = data.current || data;
@@ -106,7 +236,12 @@ function displayCurrentWeather(data, displayUnit, options = {}) {
     const conditionCode = weather.weather[0].id;
     const isDay = isDaytime(weather);
     const scene = getScene(conditionCode, weather);
-    const paletteName = options.artStyle === 'retro' ? 'retro' : isDay ? 'day' : 'night';
+    const namedStyles = ['retro', 'dracula', 'solarized', 'nord'];
+    const paletteName = namedStyles.includes(options.artStyle)
+      ? options.artStyle
+      : isDay
+        ? 'day'
+        : 'night';
     const renderer = new AsciiRenderer({
       termWidth: getTerminalWidth(),
       paletteName
@@ -127,6 +262,15 @@ function displayCurrentWeather(data, displayUnit, options = {}) {
     console.log();
   }
 
+  // Show active weather alerts above the main box
+  if (data.alerts && data.alerts.length > 0) {
+    const alertOutput = displayAlerts(data.alerts);
+    if (alertOutput) {
+      console.log(alertOutput);
+      console.log();
+    }
+  }
+
   const emoji = weatherEmojis[weather.weather[0].main] || '🌤️';
   const termWidth = getTerminalWidth();
 
@@ -142,7 +286,7 @@ function displayCurrentWeather(data, displayUnit, options = {}) {
   const windGust = weather.wind.gust
     ? ` (gust ${formatWindSpeed(weather.wind.gust, displayUnit, windUnit)})`
     : '';
-  const wind = `${formatWindSpeed(weather.wind.speed, displayUnit, windUnit)} @ ${weather.wind.deg}°${windGust}`;
+  const wind = `${formatWindSpeed(weather.wind.speed, displayUnit, windUnit)} @ ${weather.wind.deg}° ${degToCardinal(weather.wind.deg)}${windGust}`;
   const visFormatted = formatVisibility(weather.visibility, displayUnit);
 
   const left = [
@@ -154,8 +298,8 @@ function displayCurrentWeather(data, displayUnit, options = {}) {
   ];
 
   const right = [
-    `Sunrise:     ${formatTime(weather.sys.sunrise)}`,
-    `Sunset:      ${formatTime(weather.sys.sunset)}`,
+    `Sunrise:     ${formatTime(weather.sys.sunrise)} (${formatRelativeTime(weather.sys.sunrise)})`,
+    `Sunset:      ${formatTime(weather.sys.sunset)} (${formatRelativeTime(weather.sys.sunset)})`,
     aqi ? `Air Quality: ${getAirQualityDescription(aqi)} (AQI: ${aqi})` : '',
     `Min/Max:     ${formatTemp(weather.main.temp_min, displayUnit, { colorCode: true, type: 'min' })} / ${formatTemp(weather.main.temp_max, displayUnit, { colorCode: true, type: 'max' })}`,
     `Wind:        ${wind}`,
@@ -209,9 +353,22 @@ function display5DayForecast(data, displayUnit) {
     });
   });
 
+  // Collect AQI values from forecast items per day, then use the
+  // pre-computed dailyAqi map as a fallback.
+  const forecastAqiByDay = {};
+  data.forecast.list.forEach((item) => {
+    if (item.aqi !== null && item.aqi !== undefined) {
+      const dateKey = new Date(item.dt * 1000).toDateString();
+      if (!forecastAqiByDay[dateKey]) forecastAqiByDay[dateKey] = [];
+      forecastAqiByDay[dateKey].push(item.aqi);
+    }
+  });
+
+  const aqiEmojis = { 1: '🟢', 2: '🟡', 3: '🟠', 4: '🔴', 5: '🟣' };
+
   const forecastLines = Object.entries(dailyData)
     .slice(0, 5)
-    .map(([_, info]) => {
+    .map(([dateKey, info]) => {
       const minTemp = Math.min(...info.temps);
       const maxTemp = Math.max(...info.temps);
 
@@ -225,7 +382,20 @@ function display5DayForecast(data, displayUnit) {
       const dayLabel = info.isToday ? chalk.yellow(`${info.dayName}`) : info.dayName;
       const temps = `${formatTemp(minTemp, displayUnit, { colorCode: true, type: 'min' })}/${formatTemp(maxTemp, displayUnit, { colorCode: true, type: 'max' })}`;
 
-      return `${emoji} ${dayLabel.padEnd(4)} ${temps}`;
+      // Prefer forecast-item AQI mode, fall back to dailyAqi map
+      let aqiLabel = '';
+      const dailyAqi = data.dailyAqi?.[dateKey];
+      const itemAqis = forecastAqiByDay[dateKey];
+      if (itemAqis && itemAqis.length > 0) {
+        const mode = modeValue(itemAqis);
+        const aqEmoji = aqiEmojis[mode] || '';
+        aqiLabel = ` ${aqEmoji}${getAirQualityDescription(mode)}`;
+      } else if (dailyAqi !== null && dailyAqi !== undefined) {
+        const aqEmoji = aqiEmojis[dailyAqi] || '';
+        aqiLabel = ` ${aqEmoji}${getAirQualityDescription(dailyAqi)}`;
+      }
+
+      return `${emoji} ${dayLabel.padEnd(4)} ${temps}${aqiLabel}`;
     });
 
   console.log(
@@ -250,7 +420,20 @@ function display24HourForecast(data, displayUnit) {
   const innerWidth = boxWidth - 4; // accounts for boxen padding (left+right=2) + borders (1+1)
 
   const renderedSpark = renderSparklineBlock(next24Hours, displayUnit, innerWidth);
-  const content = renderedSpark || renderForecastList(next24Hours, displayUnit);
+
+  // Build AQI summary line for the 24-hour period
+  const aqiValues = next24Hours
+    .map((item) => item.aqi)
+    .filter((v) => v !== null && v !== undefined);
+  let aqiSummaryLine = '';
+  if (aqiValues.length > 0) {
+    const modeAqi = modeValue(aqiValues);
+    const currentAqi = data.pollution?.list?.[0]?.main?.aqi;
+    const displayAqi = currentAqi ?? modeAqi;
+    aqiSummaryLine = `\nAir Quality: ${getAirQualityDescription(displayAqi)} (AQI: ${displayAqi})`;
+  }
+
+  const content = (renderedSpark || renderForecastList(next24Hours, displayUnit)) + aqiSummaryLine;
 
   console.log(
     boxen(content, {
@@ -336,9 +519,120 @@ function renderForecastList(items, displayUnit) {
       });
       const emoji = weatherEmojis[item.weather[0].main] || '🌤️';
       const temp = formatTemp(item.main.temp, displayUnit);
-      return `${time.padEnd(6)} ${emoji} ${temp.padEnd(6)} ${chalk.gray(item.weather[0].description)}`;
+      const aqiTag =
+        item.aqi !== null && item.aqi !== undefined ? ` ${getAirQualityDescription(item.aqi)}` : '';
+      return `${time.padEnd(6)} ${emoji} ${temp.padEnd(6)} ${chalk.gray(item.weather[0].description)}${aqiTag}`;
     })
     .join('\n');
+}
+
+/**
+ * Render a precipitation chart for the next hour using Open-Meteo minutely_15
+ * data.  Shows up to 4 intervals (4 × 15 minutes = 60 min) as a continuous
+ * braille-style bar chart inside a bordered box.
+ *
+ * @param {object} data - Normalised weather data (must include data.minutely)
+ * @param {string} displayUnit - 'celsius' or 'fahrenheit' (unused for precip but kept for API consistency)
+ */
+function displayMinutelyForecast(data, _displayUnit) {
+  const minutely = data.minutely || {};
+  const precip = minutely.precipitation || [];
+
+  if (precip.length === 0) {
+    console.log(chalk.yellow('📦 No minutely precipitation data available for this location.'));
+    return;
+  }
+
+  // Show up to 4 intervals (60 minutes). The API may return more; we take
+  // the first 4 which correspond to the next hour.
+  const maxIntervals = Math.min(precip.length, 4);
+  const values = precip.slice(0, maxIntervals);
+
+  // If all values are zero or the array is too short, still show the chart
+  // but indicate no precipitation expected.
+  const termWidth = process.stdout.columns || 80;
+  const boxWidth = Math.min(termWidth - 2, 88);
+  const innerWidth = boxWidth - 4; // boxen padding + borders
+
+  // Build a continuous braille bar chart.
+  // We stretch the precipitation values across the inner width using the
+  // braille chart renderer for a smooth line.
+  let chartLine;
+  if (values.length >= 2) {
+    chartLine = renderBrailleLineChart(values, { width: innerWidth, height: 2 });
+  } else {
+    // Single data point — show a simple bar representation
+    chartLine = values[0] > 0 ? '█'.repeat(innerWidth) : '─'.repeat(innerWidth);
+  }
+
+  // Determine colour based on peak precipitation
+  const peakPrecip = Math.max(...values, 0);
+  let precipColor = chalk.cyan;
+  if (peakPrecip >= 5) precipColor = chalk.red;
+  else if (peakPrecip >= 2) precipColor = chalk.yellow;
+  else if (peakPrecip >= 0.5) precipColor = chalk.blue;
+
+  // Build time labels
+  const timeLabels = [];
+  for (let i = 0; i < maxIntervals; i++) {
+    if (i === 0) timeLabels.push('Now');
+    else timeLabels.push(`${i * 15}m`);
+  }
+  // Always add the endpoint label if we have intervals
+  if (maxIntervals >= 2) {
+    timeLabels.push(`${maxIntervals * 15}m`);
+  }
+
+  // Place labels at positions proportional to the chart
+  const labelPositions = timeLabels.map((label, i) => {
+    // Spread labels across the chart width
+    const col =
+      maxIntervals <= 1 ? 0 : Math.round((i / (timeLabels.length - 1 || 1)) * (innerWidth - 1));
+    return { label, col };
+  });
+
+  const labelRow = labelPositions
+    .reduce(
+      (acc, { label, col }) => {
+        const startCol = Math.max(col, acc.cursor);
+        acc.parts.push(' '.repeat(Math.max(0, startCol - acc.cursor)) + label);
+        acc.cursor = startCol + label.length;
+        return acc;
+      },
+      { parts: [], cursor: 0 }
+    )
+    .parts.join('');
+
+  // Peak precipitation description
+  let precipDesc = 'No precipitation expected in the next hour';
+  if (peakPrecip > 0) {
+    precipDesc = `Peak: ${peakPrecip.toFixed(1)} mm/15min`;
+  }
+
+  // Determine if any precipitation is happening
+  const hasRain = values.some((v) => v > 0);
+  const icon = hasRain ? '🌧️' : '☀️';
+  const titleText = hasRain ? 'Precipitation next hour' : 'No rain next hour';
+
+  const content = [
+    precipColor(chartLine),
+    '',
+    chalk.gray(labelRow),
+    '',
+    chalk.white(precipDesc)
+  ].join('\n');
+
+  console.log(
+    boxen(content, {
+      title: chalk.bold(`${icon} ${titleText}`),
+      titleAlignment: 'left',
+      padding: { top: 0, bottom: 0, left: 1, right: 1 },
+      margin: 0,
+      borderStyle: 'round',
+      borderColor: hasRain ? 'blue' : 'green',
+      width: boxWidth
+    })
+  );
 }
 
 export {
@@ -346,9 +640,13 @@ export {
   formatWindSpeed,
   formatVisibility,
   formatTime,
+  formatRelativeTime,
+  degToCardinal,
   getAirQualityDescription,
   displayCurrentWeather,
   display5DayForecast,
   display24HourForecast,
+  displayAlerts,
+  displayMinutelyForecast,
   createDataRow
 };

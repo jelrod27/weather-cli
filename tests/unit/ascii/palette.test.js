@@ -4,10 +4,13 @@ import { palettes, PALETTE_KEYS, getPalette } from '../../../src/ascii/palette.j
 const HEX_REGEX = /^#[0-9A-Fa-f]{6}$/;
 
 describe('palettes', () => {
-  it('has day, night, and retro palettes', () => {
+  it('has day, night, retro, dracula, solarized, and nord palettes', () => {
     expect(palettes).toHaveProperty('day');
     expect(palettes).toHaveProperty('night');
     expect(palettes).toHaveProperty('retro');
+    expect(palettes).toHaveProperty('dracula');
+    expect(palettes).toHaveProperty('solarized');
+    expect(palettes).toHaveProperty('nord');
   });
 
   for (const [name, palette] of Object.entries(palettes)) {
@@ -42,6 +45,18 @@ describe('getPalette', () => {
 
   it('returns the retro palette by name', () => {
     expect(getPalette('retro')).toBe(palettes.retro);
+  });
+
+  it('returns the dracula palette by name', () => {
+    expect(getPalette('dracula')).toBe(palettes.dracula);
+  });
+
+  it('returns the solarized palette by name', () => {
+    expect(getPalette('solarized')).toBe(palettes.solarized);
+  });
+
+  it('returns the nord palette by name', () => {
+    expect(getPalette('nord')).toBe(palettes.nord);
   });
 
   it('falls back to day palette for unknown names', () => {

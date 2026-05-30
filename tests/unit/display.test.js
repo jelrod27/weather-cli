@@ -1,11 +1,15 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   formatTemp,
   formatWindSpeed,
   formatVisibility,
   formatTime,
+  formatRelativeTime,
+  degToCardinal,
   getAirQualityDescription,
-  createDataRow
+  createDataRow,
+  displayAlerts,
+  displayMinutelyForecast
 } from '../../src/display.js';
 
 describe('formatTemp', () => {
@@ -138,5 +142,209 @@ describe('createDataRow', () => {
     const row = createDataRow('Label:', 'Value');
     expect(row).toContain('Label:');
     expect(row).toContain('Value');
+  });
+});
+
+describe('displayAlerts', () => {
+  it('returns empty string when alerts array is empty', () => {
+    expect(displayAlerts([])).toBe('');
+  });
+
+  it('returns empty string when alerts is null or undefined', () => {
+    expect(displayAlerts(null)).toBe('');
+    expect(displayAlerts(undefined)).toBe('');
+  });
+
+  it('returns a string containing alert headline for a severe alert', () => {
+    const alerts = [
+      {
+        headline: 'Severe Thunderstorm Warning',
+        severity: 'Severe',
+        urgency: 'Immediate',
+        description: 'A severe thunderstorm is expected.',
+        event: 'Severe Thunderstorm Warning'
+      }
+    ];
+    const result = displayAlerts(alerts);
+    expect(result).toContain('Severe Thunderstorm Warning');
+    expect(result).not.toBe('');
+  });
+
+  it('returns a string for an extreme alert', () => {
+    const alerts = [
+      {
+        headline: 'Tornado Warning',
+        severity: 'Extreme',
+        urgency: 'Immediate',
+        description: 'Tornado spotted.',
+        event: 'Tornado Warning'
+      }
+    ];
+    const result = displayAlerts(alerts);
+    expect(result).toContain('Tornado Warning');
+  });
+
+  it('includes description snippet when description exists', () => {
+    const alerts = [
+      {
+        headline: 'Flood Advisory',
+        severity: 'Minor',
+        urgency: 'Expected',
+        description: 'Flooding is possible in low-lying areas.',
+        event: 'Flood Advisory'
+      }
+    ];
+    const result = displayAlerts(alerts);
+    expect(result).toContain('Flood Advisory');
+  });
+});
+
+describe('formatRelativeTime', () => {
+  const now = Math.floor(Date.now() / 1000);
+
+  it('returns "in Xm" for a few minutes in the future', () => {
+    const result = formatRelativeTime(now + 180); // 3 minutes from now
+    expect(result).toMatch(/^in \d+m$/);
+  });
+
+  it('returns "in Xh Ym" for hours and minutes in the future', () => {
+    const result = formatRelativeTime(now + 3 * 3600 + 22 * 60); // 3h 22m from now
+    expect(result).toMatch(/^in \d+h \d+m$/);
+  });
+
+  it('returns "Xm ago" for a recent past timestamp', () => {
+    const result = formatRelativeTime(now - 5 * 60); // 5 minutes ago
+    expect(result).toMatch(/^\d+m ago$/);
+  });
+
+  it('returns "Xh Ym ago" for a past timestamp hours ago', () => {
+    const result = formatRelativeTime(now - 2 * 3600 - 15 * 60); // 2h 15m ago
+    expect(result).toMatch(/^\d+h \d+m ago$/);
+  });
+
+  it('returns "in 0m" for right now', () => {
+    const result = formatRelativeTime(now);
+    expect(result).toMatch(/^in \d+m$/);
+  });
+
+  it('returns "in Xm" for one minute in the future', () => {
+    const result = formatRelativeTime(now + 60);
+    expect(result).toMatch(/^in \d+m$/);
+  });
+});
+
+describe('degToCardinal', () => {
+  it('returns N for 0 degrees', () => {
+    expect(degToCardinal(0)).toBe('N');
+  });
+  it('returns NE for 45 degrees', () => {
+    expect(degToCardinal(45)).toBe('NE');
+  });
+  it('returns E for 90 degrees', () => {
+    expect(degToCardinal(90)).toBe('E');
+  });
+  it('returns S for 180 degrees', () => {
+    expect(degToCardinal(180)).toBe('S');
+  });
+  it('returns W for 270 degrees', () => {
+    expect(degToCardinal(270)).toBe('W');
+  });
+  it('handles negative degrees', () => {
+    expect(degToCardinal(-90)).toBe('W');
+  });
+  it('handles degrees over 360', () => {
+    expect(degToCardinal(370)).toBe('N');
+  });
+});
+
+describe('displayMinutelyForecast', () => {
+  it('outputs a message when no minutely data is available', () => {
+    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    displayMinutelyForecast({}, 'celsius');
+    expect(spy).toHaveBeenCalled();
+    const output = spy.mock.calls.map((args) => args.join('')).join('\n');
+    expect(output).toContain('No minutely precipitation data');
+    spy.mockRestore();
+  });
+
+  it('outputs a message when minutely has no precipitation array', () => {
+    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    displayMinutelyForecast({ minutely: { time: [] } }, 'celsius');
+    expect(spy).toHaveBeenCalled();
+    const output = spy.mock.calls.map((args) => args.join('')).join('\n');
+    expect(output).toContain('No minutely precipitation data');
+    spy.mockRestore();
+  });
+
+  it('renders a chart when minutely precipitation data is present', () => {
+    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    displayMinutelyForecast(
+      {
+        minutely: {
+          time: ['2026-05-29T12:00', '2026-05-29T12:15', '2026-05-29T12:30', '2026-05-29T12:45'],
+          precipitation: [0, 0.5, 1.2, 0.3]
+        }
+      },
+      'celsius'
+    );
+    expect(spy).toHaveBeenCalled();
+    const output = spy.mock.calls.map((args) => args.join('')).join('\n');
+    // Box title should reference precipitation
+    expect(output).toContain('Precipitation next hour');
+    // Should show peak info
+    expect(output).toContain('Peak');
+    spy.mockRestore();
+  });
+
+  it('renders "No rain next hour" when all precipitation values are zero', () => {
+    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    displayMinutelyForecast(
+      {
+        minutely: {
+          time: ['2026-05-29T12:00', '2026-05-29T12:15', '2026-05-29T12:30', '2026-05-29T12:45'],
+          precipitation: [0, 0, 0, 0]
+        }
+      },
+      'celsius'
+    );
+    expect(spy).toHaveBeenCalled();
+    const output = spy.mock.calls.map((args) => args.join('')).join('\n');
+    expect(output).toContain('No rain next hour');
+    expect(output).toContain('No precipitation expected');
+    spy.mockRestore();
+  });
+
+  it('renders with a single data point without crashing', () => {
+    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    displayMinutelyForecast(
+      {
+        minutely: {
+          time: ['2026-05-29T12:00'],
+          precipitation: [2.5]
+        }
+      },
+      'celsius'
+    );
+    expect(spy).toHaveBeenCalled();
+    const output = spy.mock.calls.map((args) => args.join('')).join('\n');
+    expect(output).toContain('Peak');
+    spy.mockRestore();
+  });
+
+  it('works with fahrenheit display unit (unit does not affect precipitation)', () => {
+    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    displayMinutelyForecast(
+      {
+        minutely: {
+          time: ['2026-05-29T12:00', '2026-05-29T12:15'],
+          precipitation: [0.1, 1.0]
+        }
+      },
+      'fahrenheit'
+    );
+    expect(spy).toHaveBeenCalled();
+    const output = spy.mock.calls.map((args) => args.join('')).join('\n');
+    expect(output).toContain('Precipitation next hour');
+    spy.mockRestore();
   });
 });
