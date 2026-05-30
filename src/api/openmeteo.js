@@ -2,6 +2,7 @@ import httpClient from './http.js';
 import { WeatherError, ERROR_CODES } from '../utils/errors.js';
 import { sanitizeForDisplay } from '../utils/validators.js';
 import { wmoToOwm, usAqiToOwmAqi } from './wmoToOwm.js';
+import { fetchAlerts, sortAlerts } from './alerts.js';
 
 const GEOCODING_URL = 'https://geocoding-api.open-meteo.com/v1/search';
 const FORECAST_URL = 'https://api.open-meteo.com/v1/forecast';
@@ -99,51 +100,86 @@ export async function geocode(input) {
   };
 }
 
-export async function fetchForecast(lat, lon, { tempUnit, windUnit }) {
-  const res = await httpClient.get(FORECAST_URL, {
-    params: {
-      latitude: lat,
-      longitude: lon,
-      current: [
-        'temperature_2m',
-        'apparent_temperature',
-        'relative_humidity_2m',
-        'pressure_msl',
-        'weather_code',
-        'is_day',
-        'wind_speed_10m',
-        'wind_direction_10m',
-        'wind_gusts_10m',
-        'cloud_cover'
-      ].join(','),
-      hourly: [
-        'temperature_2m',
-        'weather_code',
-        'wind_speed_10m',
-        'wind_direction_10m',
-        'relative_humidity_2m',
-        'visibility'
-      ].join(','),
-      daily: ['weather_code', 'temperature_2m_max', 'temperature_2m_min', 'sunrise', 'sunset'].join(
-        ','
-      ),
-      timezone: 'auto',
-      forecast_days: 6,
-      temperature_unit: tempUnit,
-      wind_speed_unit: windUnit
-    }
-  });
+export async function fetchForecast(lat, lon, { tempUnit, windUnit, includeMinutely = false }) {
+  const params = {
+    latitude: lat,
+    longitude: lon,
+    current: [
+      'temperature_2m',
+      'apparent_temperature',
+      'relative_humidity_2m',
+      'pressure_msl',
+      'weather_code',
+      'is_day',
+      'wind_speed_10m',
+      'wind_direction_10m',
+      'wind_gusts_10m',
+      'cloud_cover'
+    ].join(','),
+    hourly: [
+      'temperature_2m',
+      'weather_code',
+      'wind_speed_10m',
+      'wind_direction_10m',
+      'relative_humidity_2m',
+      'visibility'
+    ].join(','),
+    daily: ['weather_code', 'temperature_2m_max', 'temperature_2m_min', 'sunrise', 'sunset'].join(
+      ','
+    ),
+    timezone: 'auto',
+    forecast_days: 6,
+    temperature_unit: tempUnit,
+    wind_speed_unit: windUnit
+  };
+
+  if (includeMinutely) {
+    params.minutely_15 = 'precipitation';
+  }
+
+  const res = await httpClient.get(FORECAST_URL, { params });
   return res.data;
 }
 
 export async function fetchAirQuality(lat, lon) {
   try {
     const res = await httpClient.get(AIR_QUALITY_URL, {
-      params: { latitude: lat, longitude: lon, current: 'us_aqi' }
+      params: {
+        latitude: lat,
+        longitude: lon,
+        current: 'us_aqi',
+        hourly: 'us_aqi',
+        timezone: 'auto'
+      }
     });
-    return res.data?.current?.us_aqi ?? null;
+    const hourly = res.data?.hourly || {};
+    // Derive daily AQI from hourly averages (API has no daily US AQI variable)
+    const daily = { time: [], us_aqi: [] };
+    const hTimes = hourly.time || [];
+    const hVals = hourly.us_aqi || [];
+    if (hTimes.length > 0) {
+      const dayBuckets = {};
+      for (let i = 0; i < hTimes.length && i < hVals.length; i++) {
+        const dayKey = hTimes[i].slice(0, 10); // YYYY-MM-DD
+        if (!dayBuckets[dayKey]) dayBuckets[dayKey] = [];
+        if (hVals[i] !== null && hVals[i] !== undefined) {
+          dayBuckets[dayKey].push(hVals[i]);
+        }
+      }
+      for (const [day, vals] of Object.entries(dayBuckets)) {
+        daily.time.push(day);
+        daily.us_aqi.push(
+          vals.length > 0 ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : null
+        );
+      }
+    }
+    return {
+      current: res.data?.current?.us_aqi ?? null,
+      hourly,
+      daily
+    };
   } catch {
-    return null;
+    return { current: null, hourly: {}, daily: {} };
   }
 }
 
@@ -168,9 +204,21 @@ function nearestHourlyIndex(times, refIso) {
   return bestIdx;
 }
 
+/**
+ * Fetch and sort weather alerts for a location.
+ * @param {number} lat
+ * @param {number} lon
+ * @param {string} countryCode
+ * @returns {Promise<Array>} Sorted alert array
+ */
+export async function getAlerts(lat, lon, countryCode) {
+  const alerts = await fetchAlerts(lat, lon, countryCode);
+  return sortAlerts(alerts);
+}
+
 // Build OWM-shaped object from Open-Meteo responses + geocoding result.
 // Display layer reads this shape unchanged.
-export function normalizeToOwmShape({ place, forecast, usAqi, windUnit = 'ms' }) {
+export function normalizeToOwmShape({ place, forecast, airQuality, windUnit = 'ms', alerts = [] }) {
   const cur = forecast.current || {};
   const hourly = forecast.hourly || {};
   const daily = forecast.daily || {};
@@ -183,6 +231,21 @@ export function normalizeToOwmShape({ place, forecast, usAqi, windUnit = 'ms' })
   const sunsetIso = daily.sunset?.[0];
   const dt = isoToUnix(cur.time) ?? Math.floor(Date.now() / 1000);
 
+  // Air quality data
+  const aqCurrent = airQuality.current; // raw US AQI number or null
+  const aqHourlyTimes = airQuality.hourly?.time || [];
+  const aqHourlyValues = airQuality.hourly?.us_aqi || [];
+  const aqDailyTimes = airQuality.daily?.time || [];
+  const aqDailyValues = airQuality.daily?.us_aqi || [];
+
+  // Build a map of date string → daily AQI (OWM 1-5 scale)
+  const dailyAqiMap = {};
+  for (let d = 0; d < aqDailyTimes.length && d < aqDailyValues.length; d++) {
+    const aqi = usAqiToOwmAqi(aqDailyValues[d]);
+    const dateKey = new Date(aqDailyTimes[d] + 'T12:00:00').toDateString();
+    dailyAqiMap[dateKey] = aqi;
+  }
+
   const list = [];
   const times = hourly.time || [];
   // Open-Meteo hourly starts at 00:00 local with no past_days, so times[0] is
@@ -191,6 +254,32 @@ export function normalizeToOwmShape({ place, forecast, usAqi, windUnit = 'ms' })
   const startIdx = Math.ceil(curIdx / 3) * 3;
   for (let i = startIdx; i < times.length && list.length < 40; i += 3) {
     const wmo = wmoToOwm(hourly.weather_code?.[i]);
+    // Find the nearest hourly AQI sample for this 3-hour period
+    let periodAqi = null;
+    for (let j = i; j < i + 3 && j < aqHourlyTimes.length; j++) {
+      if (
+        aqHourlyTimes[j] === times[i] &&
+        aqHourlyValues[j] !== null &&
+        aqHourlyValues[j] !== undefined
+      ) {
+        periodAqi = usAqiToOwmAqi(aqHourlyValues[j]);
+        break;
+      }
+    }
+    if (periodAqi === null) {
+      // Fallback: scan a small window around the target index
+      for (let offset = 0; offset < 3; offset++) {
+        const j = i + offset;
+        if (
+          j < aqHourlyValues.length &&
+          aqHourlyValues[j] !== null &&
+          aqHourlyValues[j] !== undefined
+        ) {
+          periodAqi = usAqiToOwmAqi(aqHourlyValues[j]);
+          break;
+        }
+      }
+    }
     list.push({
       dt: isoToUnix(times[i]),
       main: {
@@ -205,12 +294,16 @@ export function normalizeToOwmShape({ place, forecast, usAqi, windUnit = 'ms' })
         speed: hourly.wind_speed_10m?.[i] ?? cur.wind_speed_10m ?? 0,
         deg: hourly.wind_direction_10m?.[i] ?? cur.wind_direction_10m ?? 0
       },
+      aqi: periodAqi,
       dt_txt: times[i]
     });
   }
 
-  const aqi = usAqiToOwmAqi(usAqi);
+  const aqi = usAqiToOwmAqi(aqCurrent);
   const pollution = aqi !== null ? { list: [{ main: { aqi } }] } : { list: [] };
+
+  // Minutely-15 precipitation data (for radar command)
+  const minutely = forecast.minutely_15 || {};
 
   return {
     current: {
@@ -240,6 +333,9 @@ export function normalizeToOwmShape({ place, forecast, usAqi, windUnit = 'ms' })
     },
     forecast: { list },
     pollution,
-    windUnit
+    dailyAqi: dailyAqiMap,
+    windUnit,
+    alerts,
+    minutely
   };
 }

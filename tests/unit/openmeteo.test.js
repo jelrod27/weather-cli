@@ -155,7 +155,11 @@ describe('normalizeToOwmShape', () => {
   };
 
   it('produces an OWM-shaped current block', () => {
-    const data = normalizeToOwmShape({ place, forecast, usAqi: 42 });
+    const data = normalizeToOwmShape({
+      place,
+      forecast,
+      airQuality: { current: 42, hourly: {}, daily: {} }
+    });
     expect(data.current.name).toBe('San Ramon');
     expect(data.current.coord).toEqual({ lat: 37.78, lon: -121.97 });
     expect(data.current.sys.country).toBe('US');
@@ -177,7 +181,11 @@ describe('normalizeToOwmShape', () => {
   });
 
   it('produces a future-only forecast list at 3-hour stride', () => {
-    const data = normalizeToOwmShape({ place, forecast, usAqi: 42 });
+    const data = normalizeToOwmShape({
+      place,
+      forecast,
+      airQuality: { current: 42, hourly: {}, daily: {} }
+    });
     expect(Array.isArray(data.forecast.list)).toBe(true);
     // current.time is 12:00 (curIdx=4); next 3-hour boundary >= 4 is 6.
     // Indices 6, 9, 12, 15 → 4 future entries.
@@ -191,26 +199,117 @@ describe('normalizeToOwmShape', () => {
   });
 
   it('normalizes air quality from US AQI to OWM 1–5 scale', () => {
-    const data = normalizeToOwmShape({ place, forecast, usAqi: 42 });
+    const data = normalizeToOwmShape({
+      place,
+      forecast,
+      airQuality: { current: 42, hourly: {}, daily: {} }
+    });
     expect(data.pollution.list[0].main.aqi).toBe(1);
 
-    const noAqi = normalizeToOwmShape({ place, forecast, usAqi: null });
+    const noAqi = normalizeToOwmShape({
+      place,
+      forecast,
+      airQuality: { current: null, hourly: {}, daily: {} }
+    });
     expect(noAqi.pollution.list).toEqual([]);
   });
 
   it('uses visibility from the hourly entry nearest the current time', () => {
-    const data = normalizeToOwmShape({ place, forecast, usAqi: null });
+    const data = normalizeToOwmShape({
+      place,
+      forecast,
+      airQuality: { current: null, hourly: {}, daily: {} }
+    });
     // Current time is 12:00, which matches index 4 → visibility 12000
     expect(data.current.visibility).toBe(12000);
   });
 
   it('defaults windUnit to ms when not provided', () => {
-    const data = normalizeToOwmShape({ place, forecast, usAqi: null });
+    const data = normalizeToOwmShape({
+      place,
+      forecast,
+      airQuality: { current: null, hourly: {}, daily: {} }
+    });
     expect(data.windUnit).toBe('ms');
   });
 
   it('includes windUnit in the returned shape when provided', () => {
-    const data = normalizeToOwmShape({ place, forecast, usAqi: null, windUnit: 'mph' });
+    const data = normalizeToOwmShape({
+      place,
+      forecast,
+      airQuality: { current: null, hourly: {}, daily: {} },
+      windUnit: 'mph'
+    });
     expect(data.windUnit).toBe('mph');
+  });
+
+  it('includes AQI in forecast items when hourly AQI data is available', () => {
+    const airQuality = {
+      current: 42,
+      hourly: {
+        time: forecast.hourly.time,
+        us_aqi: [30, 35, 40, 45, 42, 50, 55, 38, 28, 32, 44, 48, 52, 60, 42, 36]
+      },
+      daily: {}
+    };
+    const data = normalizeToOwmShape({ place, forecast, airQuality });
+    // Forecast items starting from index 6 should have aqi
+    expect(data.forecast.list.length).toBeGreaterThan(0);
+    expect(data.forecast.list[0].aqi).toBe(2); // 55 → OWM scale 2 (Fair)
+    expect(data.forecast.list[1].aqi).toBe(1); // 28 → OWM scale 1 (Good)
+  });
+
+  it('includes dailyAqi map when daily AQI data is available', () => {
+    const airQuality = {
+      current: 42,
+      hourly: {},
+      daily: {
+        time: ['2026-04-26', '2026-04-27'],
+        us_aqi: [42, 120]
+      }
+    };
+    const data = normalizeToOwmShape({ place, forecast, airQuality });
+    const satKey = new Date('2026-04-26T12:00:00').toDateString();
+    const sunKey = new Date('2026-04-27T12:00:00').toDateString();
+    expect(data.dailyAqi[satKey]).toBe(1); // 42 → Good
+    expect(data.dailyAqi[sunKey]).toBe(3); // 120 → Moderate (101-150)
+  });
+
+  it('handles missing AQI data gracefully', () => {
+    const data = normalizeToOwmShape({
+      place,
+      forecast,
+      airQuality: { current: null, hourly: {}, daily: {} }
+    });
+    expect(data.pollution.list).toEqual([]);
+    expect(data.dailyAqi).toEqual({});
+    expect(data.forecast.list[0].aqi).toBeNull();
+  });
+
+  it('includes minutely data when present in the forecast', () => {
+    const forecastWithMinutely = {
+      ...forecast,
+      minutely_15: {
+        time: ['2026-04-26T12:00', '2026-04-26T12:15', '2026-04-26T12:30', '2026-04-26T12:45'],
+        precipitation: [0, 0.5, 1.2, 0.3]
+      }
+    };
+    const data = normalizeToOwmShape({
+      place,
+      forecast: forecastWithMinutely,
+      airQuality: { current: null, hourly: {}, daily: {} }
+    });
+    expect(data.minutely).toBeDefined();
+    expect(data.minutely.precipitation).toEqual([0, 0.5, 1.2, 0.3]);
+    expect(data.minutely.time).toHaveLength(4);
+  });
+
+  it('includes empty minutely object when forecast has no minutely_15 data', () => {
+    const data = normalizeToOwmShape({
+      place,
+      forecast,
+      airQuality: { current: null, hourly: {}, daily: {} }
+    });
+    expect(data.minutely).toEqual({});
   });
 });

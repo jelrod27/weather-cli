@@ -18,7 +18,8 @@ import {
 import {
   displayCurrentWeather,
   display5DayForecast,
-  display24HourForecast
+  display24HourForecast,
+  displayMinutelyForecast
 } from './src/display.js';
 import {
   processTemperatureOptions,
@@ -48,7 +49,7 @@ function withArtOptions(cmd) {
     .option('--art', 'Display ASCII art weather scene')
     .option('--no-art', 'Disable ASCII art')
     .option('--art-only', 'Display only the ASCII art scene')
-    .option('--art-style <style>', 'Art color style: default, retro')
+    .option('--art-style <style>', 'Art color style: default, retro, dracula, solarized, nord')
     .option('--animate', 'Animate the ASCII art scene');
 }
 
@@ -270,6 +271,16 @@ withArtOptions(
     fetcher: (_loc, units) => getWeatherByCoords(lat, lon, units)
   });
   displayCurrentWeather(data, data.displayUnit, artOpts);
+});
+
+withUnitOptions(
+  program.command('radar [location]').description('Show precipitation radar for the next hour')
+).action(async (location, options) => {
+  const loc = await resolveLocation(location);
+  const userUnits = processTemperatureOptions(options);
+  // Always fetch fresh data for radar — minute-level precipitation changes fast
+  const data = await getWeather(loc, userUnits, { includeMinutely: true });
+  displayMinutelyForecast(data, data.displayUnit);
 });
 
 program
