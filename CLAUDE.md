@@ -63,9 +63,9 @@ Single shared `axios` instance with 5 s timeout, `User-Agent: weather-cli/<versi
 
 ### Cache (src/cache.js)
 
-JSON file at repo root: `.weather-cache.json`. 30-min entry expiry, 100-entry cap, 7-day hard max age, in-memory `accessOrder` array for LRU eviction. `accessOrder` is module-scoped so it's only meaningful within a single CLI invocation — across invocations LRU degrades to "first 100 surviving entries kept."
+JSON file in the XDG cache directory: `~/.cache/weather-cli/cache.json` (or `$XDG_CACHE_HOME/weather-cli/cache.json`). Entry expiry defaults to 30 min (configurable via `cacheTtl` in config), 100-entry cap, 7-day hard max age, and persisted `lastAccessed` timestamps to support LRU-style eviction across CLI invocations.
 
-Each cache entry carries a `schemaVersion` field. Bump `CACHE_SCHEMA_VERSION` in `src/cache.js` whenever the cached `data` shape changes — older entries are silently skipped on read. Current value: `2` (post-Open-Meteo cutover).
+Each cache entry carries a `schemaVersion` field. Bump `CACHE_SCHEMA_VERSION` in `src/cache.js` whenever the cached `data` shape changes — older entries are silently skipped on read. Current value: `3`.
 
 ### ASCII art subsystem (src/ascii/)
 
@@ -73,7 +73,7 @@ Each cache entry carries a `schemaVersion` field. Bump `CACHE_SCHEMA_VERSION` in
 
 ### Config (src/config.js)
 
-JSON file at repo root: `.weather-config.json`. Stores `defaultLocation`, `defaultUnits`, and `ascii: { enabled, style }`. `processTemperatureOptions()` is the single source of truth for resolving CLI flags into a unit string — call it instead of inspecting `options.celsius`/`options.fahrenheit`/`options.units` directly.
+JSON file in the XDG config directory: `~/.config/weather-cli/config.json` (or `$XDG_CONFIG_HOME/weather-cli/config.json`). Stores `defaultLocation`, `defaultUnits`, optional `cacheTtl`, and `ascii: { enabled, style }`. `processTemperatureOptions()` is the single source of truth for resolving CLI flags into a unit string — call it instead of inspecting `options.celsius`/`options.fahrenheit`/`options.units` directly.
 
 ## CI / publish flow
 
@@ -86,4 +86,3 @@ JSON file at repo root: `.weather-config.json`. Stores `defaultLocation`, `defau
 - Get `__dirname` via `dirname(fileURLToPath(import.meta.url))` — this pattern is reused across `index.js`, `cache.js`, `config.js`, and `http.js`.
 - Spinner pattern: create `ora('...').start()` inside the API call, `succeed`/`fail` it before returning/throwing.
 - Tests live in `tests/unit/*.test.js` (vitest config restricts to `tests/**/*.test.js`). `globals: true` is set, so `describe`/`it`/`expect` are available without import.
-- `tests/*.spec.js` files (`simple-weather-test.spec.js`, `weather-validation.spec.js`) are Playwright-style specs and **not** picked up by Vitest. There is a `playwright.config.{js,cjs}` but no `playwright` script in `package.json` — these aren't part of normal CI.

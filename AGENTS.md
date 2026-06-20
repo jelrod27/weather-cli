@@ -12,7 +12,7 @@ weather-cli is a Node.js command-line weather client powered by the Open-Meteo A
 - Vitest for testing
 - ESLint (flat config) + Prettier for linting/formatting
 - Pre-commit + Gitleaks for secret scanning and general hygiene
-- Husky + lint-staged is legacy and may coexist until migrated
+- Husky + lint-staged for pre-commit linting
 
 ## Repository Structure
 
@@ -20,8 +20,8 @@ weather-cli is a Node.js command-line weather client powered by the Open-Meteo A
 - `index.js` — CLI entry point (Commander program wiring)
 - `src/api/` — HTTP client, Open-Meteo adapter, WMO-to-OWM mapping
 - `src/ascii/` — ASCII art scenes and renderer
-- `src/cache.js` — JSON-file LRU cache (`.weather-cache.json`)
-- `src/config.js` — JSON-file user config (`.weather-config.json`)
+- `src/cache.js` — JSON-file LRU cache (`~/.cache/weather-cli/cache.json`)
+- `src/config.js` — JSON-file user config (`~/.config/weather-cli/config.json`)
 - `src/utils/` — errors, formatting, helpers
 - `tests/unit/` — Vitest unit tests
 - `.github/workflows/ci.yml` — CI (lint + format check + test matrix Node 20/22/24 + gitleaks)

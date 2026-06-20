@@ -17,6 +17,13 @@ vi.mock('crypto', () => ({
   randomUUID: () => 'test-uuid'
 }));
 
+// Mock config so cache.js's getCacheExpiry() gets a deterministic empty config.
+// Without this, loadConfig would try to read the config file via the mocked
+// fs/promises and get whatever data the cache test set up for readFile.
+vi.mock('../../src/config.js', () => ({
+  loadConfig: vi.fn().mockResolvedValue({})
+}));
+
 // Import after mocking
 const cacheModule = await import('../../src/cache.js');
 const {
@@ -438,13 +445,13 @@ describe('LRU eviction across invocations', () => {
     expect(parsed['NewCity-auto']).toBeDefined();
   });
 
-  it('getCachedWeather records lastAccessed on cache hit', async () => {
+  it('getCachedWeather records lastAccessed on cache hit when stale', async () => {
     const now = Date.now();
     const cachedData = {
       'London-auto': {
         data: { current: { temp: 20 } },
-        timestamp: now - 5 * 60 * 1000,
-        lastAccessed: now - 5 * 60 * 1000, // initially set at insertion time
+        timestamp: now - 10 * 60 * 1000,
+        lastAccessed: now - 10 * 60 * 1000, // 10 min ago — past the 5-min threshold
         schemaVersion: 3
       }
     };
@@ -463,6 +470,28 @@ describe('LRU eviction across invocations', () => {
     expect(parsed['London-auto'].lastAccessed).toBeGreaterThanOrEqual(before);
   });
 
+  it('getCachedWeather skips lastAccessed write when recently accessed', async () => {
+    const now = Date.now();
+    const cachedData = {
+      'London-auto': {
+        data: { current: { temp: 20 } },
+        timestamp: now - 10 * 60 * 1000,
+        lastAccessed: now - 1 * 60 * 1000, // 1 min ago — within the 5-min threshold
+        schemaVersion: 3
+      }
+    };
+    fs.readFile.mockResolvedValue(JSON.stringify(cachedData));
+    fs.writeFile.mockResolvedValue();
+    fs.rename.mockResolvedValue();
+
+    const result = await getCachedWeather('London', 'auto');
+
+    expect(result).toEqual({ current: { temp: 20 } });
+
+    // No write should occur when access is within threshold
+    expect(fs.writeFile).not.toHaveBeenCalled();
+  });
+
   it('getCachedWeather does not update lastAccessed on miss', async () => {
     fs.readFile.mockResolvedValue('{}');
     fs.writeFile.mockResolvedValue();
@@ -471,10 +500,8 @@ describe('LRU eviction across invocations', () => {
     const result = await getCachedWeather('Unknown', 'auto');
     expect(result).toBeNull();
 
-    // mergeAndSave still writes the cache, but no entry was modified
-    const writtenContent = fs.writeFile.mock.calls[0][1];
-    const parsed = JSON.parse(writtenContent);
-    expect(Object.keys(parsed)).toHaveLength(0);
+    // No write should occur on a cache miss
+    expect(fs.writeFile).not.toHaveBeenCalled();
   });
 });
 

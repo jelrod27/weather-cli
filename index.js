@@ -27,6 +27,8 @@ import {
   getDefaultUnits,
   setDefaultLocation,
   setDefaultUnits,
+  getCacheTtl,
+  setCacheTtl,
   getAsciiConfig
 } from './src/config.js';
 import { WeatherError, mapErrorToExitCode } from './src/utils/errors.js';
@@ -103,8 +105,8 @@ async function compareWeather(city1, city2, options) {
   console.log(chalk.cyan.bold(`\n🌍 Comparing weather: ${city1} vs ${city2}`));
 
   const [data1, data2] = await Promise.all([
-    getWeather(city1, userUnits),
-    getWeather(city2, userUnits)
+    fetchWithCache(city1, userUnits),
+    fetchWithCache(city2, userUnits)
   ]);
 
   console.log(chalk.green('\n📍 City 1:'));
@@ -287,6 +289,7 @@ program
   .command('config')
   .description('Configure default settings')
   .action(async () => {
+    const currentTtl = await getCacheTtl();
     const answers = await inquirer.prompt([
       {
         type: 'input',
@@ -304,12 +307,32 @@ program
           { name: 'Fahrenheit (°F)', value: 'fahrenheit' }
         ],
         default: await getDefaultUnits()
+      },
+      {
+        type: 'input',
+        name: 'cacheTtl',
+        message: 'Cache TTL in minutes (1-1440, blank for default 30):',
+        default: currentTtl ? String(currentTtl) : '',
+        validate: (input) => {
+          const trimmed = input.trim();
+          if (!trimmed) return true;
+          const num = Number.parseInt(trimmed, 10);
+          return Number.isInteger(num) && num >= 1 && num <= 1440
+            ? true
+            : 'Enter a number between 1 and 1440, or leave blank for default.';
+        },
+        filter: (input) => {
+          const trimmed = input.trim();
+          if (!trimmed) return null;
+          return Number.parseInt(trimmed, 10);
+        }
       }
     ]);
 
     await setDefaultLocation(answers.defaultLocation);
     await setDefaultUnits(answers.defaultUnits);
-    console.log(chalk.green('✅ Configuration saved!'));
+    await setCacheTtl(answers.cacheTtl);
+    console.log(chalk.green('Configuration saved!'));
   });
 
 program
