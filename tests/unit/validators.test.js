@@ -33,13 +33,19 @@ describe('validateLocation', () => {
     expect(validateLocation('London')).toBe('London');
   });
 
-  it('converts US state codes in comma-separated format', () => {
-    expect(validateLocation('New York, NY')).toBe('New York, US');
-    expect(validateLocation('San Ramon, CA')).toBe('San Ramon, US');
+  it('passes state codes through unchanged for geocoder disambiguation', () => {
+    // "San Ramon, CA" stays as-is so parseLocationQuery can extract admin1: 'CA'
+    // Rewriting to "San Ramon, US" would strip state-level disambiguation
+    expect(validateLocation('San Ramon, CA')).toBe('San Ramon, CA');
+    expect(validateLocation('New York, NY')).toBe('New York, NY');
   });
 
-  it('passes through country codes as-is', () => {
+  it('passes country codes through as-is', () => {
     expect(validateLocation('London, UK')).toBe('London, UK');
+  });
+
+  it('preserves multi-part locations', () => {
+    expect(validateLocation('San Ramon, CA, US')).toBe('San Ramon, CA, US');
   });
 
   it('throws on empty location', () => {

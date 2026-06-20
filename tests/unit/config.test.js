@@ -26,6 +26,8 @@ const {
   getDefaultUnits,
   setDefaultLocation,
   setDefaultUnits,
+  getCacheTtl,
+  setCacheTtl,
   getAsciiConfig,
   processTemperatureOptions,
   __resetForTesting
@@ -230,5 +232,41 @@ describe('processTemperatureOptions', () => {
 
   it('prioritizes --fahrenheit flag over units option', () => {
     expect(processTemperatureOptions({ fahrenheit: true, units: 'metric' })).toBe('fahrenheit');
+  });
+});
+
+describe('cache TTL', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    fs.writeFile.mockResolvedValue();
+    fs.rename.mockResolvedValue();
+  });
+
+  it('getCacheTtl returns null when not set', async () => {
+    fs.readFile.mockResolvedValue(JSON.stringify({ defaultLocation: 'London' }));
+    expect(await getCacheTtl()).toBeNull();
+  });
+
+  it('getCacheTtl returns the configured value', async () => {
+    fs.readFile.mockResolvedValue(JSON.stringify({ cacheTtl: 60 }));
+    expect(await getCacheTtl()).toBe(60);
+  });
+
+  it('setCacheTtl writes the value to config', async () => {
+    fs.readFile.mockResolvedValue(JSON.stringify({ defaultLocation: 'Paris' }));
+    await setCacheTtl(120);
+    const writtenContent = fs.writeFile.mock.calls[0][1];
+    const parsed = JSON.parse(writtenContent);
+    expect(parsed.cacheTtl).toBe(120);
+    expect(parsed.defaultLocation).toBe('Paris');
+  });
+
+  it('setCacheTtl with null removes the key', async () => {
+    fs.readFile.mockResolvedValue(JSON.stringify({ cacheTtl: 60, defaultLocation: 'NYC' }));
+    await setCacheTtl(null);
+    const writtenContent = fs.writeFile.mock.calls[0][1];
+    const parsed = JSON.parse(writtenContent);
+    expect(parsed.cacheTtl).toBeUndefined();
+    expect(parsed.defaultLocation).toBe('NYC');
   });
 });

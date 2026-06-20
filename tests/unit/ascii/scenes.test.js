@@ -82,3 +82,31 @@ for (const { module: scene, label } of scenes) {
     });
   });
 }
+
+// Verify that animated scenes actually have differing frames.
+// A scene with frameCount > 1 but identical frames is a no-op animation.
+describe('animation frame differences', () => {
+  const animatedScenes = [
+    { module: sunny, label: 'sunny' },
+    { module: cloudy, label: 'cloudy' },
+    { module: rain, label: 'rain' },
+    { module: snow, label: 'snow' },
+    { module: thunder, label: 'thunder' },
+    { module: fog, label: 'fog' },
+    { module: nightClear, label: 'night-clear' }
+  ];
+
+  for (const { module: scene, label } of animatedScenes) {
+    if (!scene.frameCount || scene.frameCount < 2) continue;
+
+    it(`${label}: at least one frame differs from frame 0`, () => {
+      const frames = scene.getFrames();
+      const frame0Json = JSON.stringify(frames[0]);
+      const anyDifferent = frames.slice(1).some((f) => JSON.stringify(f) !== frame0Json);
+      expect(
+        anyDifferent,
+        `${label} has ${scene.frameCount} frames but they are all identical`
+      ).toBe(true);
+    });
+  }
+});

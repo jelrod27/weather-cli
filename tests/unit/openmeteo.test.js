@@ -75,6 +75,55 @@ describe('parseLocationQuery', () => {
       admin1: null
     });
   });
+
+  it('recognizes US state codes as admin1 hints with country=US', () => {
+    expect(parseLocationQuery('San Ramon, CA')).toEqual({
+      name: 'San Ramon',
+      country: 'US',
+      admin1: 'CA'
+    });
+    expect(parseLocationQuery('New York, NY')).toEqual({
+      name: 'New York',
+      country: 'US',
+      admin1: 'NY'
+    });
+    expect(parseLocationQuery('Miami, FL')).toEqual({
+      name: 'Miami',
+      country: 'US',
+      admin1: 'FL'
+    });
+  });
+
+  it('recognizes Canadian province codes as admin1 with country=CA', () => {
+    expect(parseLocationQuery('Vancouver, BC')).toEqual({
+      name: 'Vancouver',
+      country: 'CA',
+      admin1: 'BC'
+    });
+    expect(parseLocationQuery('Toronto, ON')).toEqual({
+      name: 'Toronto',
+      country: 'CA',
+      admin1: 'ON'
+    });
+  });
+
+  it('does not confuse CA (California) with CA (Canada)', () => {
+    // "San Ramon, CA" → US/California, NOT Canada
+    const result = parseLocationQuery('San Ramon, CA');
+    expect(result.country).toBe('US');
+    expect(result.admin1).toBe('CA');
+  });
+
+  it('respects explicit country in 3-part input over state-code overlap', () => {
+    // "Toronto, ON, CA" → country=CA (Canada), admin1=ON
+    // Without the parts.length === 2 guard, CA would match US_STATE_CODES
+    // and incorrectly resolve to country=US, admin1=CA
+    expect(parseLocationQuery('Toronto, ON, CA')).toEqual({
+      name: 'Toronto',
+      country: 'CA',
+      admin1: 'ON'
+    });
+  });
 });
 
 describe('normalizeToOwmShape', () => {

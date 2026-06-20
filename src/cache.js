@@ -3,15 +3,36 @@ import { randomUUID } from 'crypto';
 import { join } from 'path';
 import { homedir } from 'os';
 import { WeatherError, ERROR_CODES } from './utils/errors.js';
+import { loadConfig } from './config.js';
 
 const XDG_CACHE_HOME = process.env.XDG_CACHE_HOME || join(homedir(), '.cache');
 const CACHE_DIR = join(XDG_CACHE_HOME, 'weather-cli');
 const CACHE_FILE = join(CACHE_DIR, 'cache.json');
-const CACHE_EXPIRY = 30 * 60 * 1000; // 30 minutes
+const DEFAULT_CACHE_EXPIRY = 30 * 60 * 1000; // 30 minutes
 const MAX_CACHE_SIZE = 100; // Maximum number of entries
 const MAX_CACHE_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days
 // Bump when the cached `data` shape changes. Old entries are discarded on read.
 const CACHE_SCHEMA_VERSION = 3;
+
+// Resolve the effective cache TTL from config, falling back to the default.
+// Config value `cacheTtl` is in minutes. Clamped to [1, 1440] (1 min to 24h).
+// Memoized per CLI invocation since config doesn't change mid-run.
+let _cachedExpiry = null;
+async function getCacheExpiry() {
+  if (_cachedExpiry !== null) return _cachedExpiry;
+  try {
+    const config = await loadConfig();
+    const ttlMinutes = config.cacheTtl;
+    if (typeof ttlMinutes === 'number' && ttlMinutes >= 1 && ttlMinutes <= 1440) {
+      _cachedExpiry = ttlMinutes * 60 * 1000;
+    } else {
+      _cachedExpiry = DEFAULT_CACHE_EXPIRY;
+    }
+  } catch {
+    _cachedExpiry = DEFAULT_CACHE_EXPIRY;
+  }
+  return _cachedExpiry;
+}
 
 // Ensure the cache directory exists before any file I/O.
 // Called lazily on first read/write so we don't create dirs for mere imports.
@@ -98,28 +119,50 @@ function evictOldEntries(cache) {
   return Object.fromEntries(fresh);
 }
 
+// Minimum time between lastAccessed updates on cache reads.
+// Without this, every cache hit (e.g. `weather status` in a tmux bar running
+// every minute) triggers an atomic file write. 5 min is frequent enough for
+// LRU eviction to work well, while reducing disk I/O by ~80% for status-bar
+// integrations.
+const LAST_ACCESSED_UPDATE_THRESHOLD = 5 * 60 * 1000; // 5 minutes
+
 // Get cached weather data if not expired and schema matches.
 // On a cache hit, records the access time so LRU eviction works
 // across CLI invocations (not just within one process).
+// Only writes lastAccessed if the existing value is older than the threshold
+// to avoid excessive disk I/O on frequent cache reads.
 async function getCachedWeather(location, units) {
   const key = `${location}-${units}`;
+  const expiry = await getCacheExpiry();
 
-  // Use merge-and-save so we don't clobber concurrent writes while
-  // updating lastAccessed.
-  let hitData = null;
-  await mergeAndSaveCache((diskCache) => {
-    const cached = diskCache[key];
-    if (
-      cached &&
-      cached.schemaVersion === CACHE_SCHEMA_VERSION &&
-      Date.now() - cached.timestamp < CACHE_EXPIRY
-    ) {
-      // Record the access so eviction can sort by recency
-      hitData = cached.data;
-      diskCache[key] = { ...cached, lastAccessed: Date.now() };
-    }
-    return diskCache;
-  });
+  // Read-only path: check cache without writing.
+  // We only trigger a write (to update lastAccessed) if the threshold has
+  // been exceeded, avoiding unnecessary disk I/O on every cache hit.
+  const diskCache = await loadCache();
+  const cached = diskCache[key];
+  if (
+    !cached ||
+    cached.schemaVersion !== CACHE_SCHEMA_VERSION ||
+    Date.now() - cached.timestamp >= expiry
+  ) {
+    return null;
+  }
+
+  const hitData = cached.data;
+
+  // Only write if lastAccessed is stale enough to warrant it
+  const now = Date.now();
+  const lastAccessed = cached.lastAccessed ?? cached.timestamp;
+  if (now - lastAccessed >= LAST_ACCESSED_UPDATE_THRESHOLD) {
+    await mergeAndSaveCache((dc) => {
+      // Re-read from disk inside merge to pick up concurrent writes
+      const entry = dc[key];
+      if (entry) {
+        dc[key] = { ...entry, lastAccessed: now };
+      }
+      return dc;
+    });
+  }
 
   return hitData;
 }
@@ -145,12 +188,13 @@ async function setCachedWeather(location, units, data) {
 // Clean expired cache entries
 async function cleanExpiredCache() {
   let cleaned = 0;
+  const expiry = await getCacheExpiry();
 
   await mergeAndSaveCache((diskCache) => {
     const now = Date.now();
     const result = {};
     for (const [key, value] of Object.entries(diskCache)) {
-      if (now - value.timestamp >= CACHE_EXPIRY) {
+      if (now - value.timestamp >= expiry) {
         cleaned++;
       } else {
         result[key] = value;
@@ -170,13 +214,14 @@ async function cleanExpiredCache() {
 async function getCacheStats() {
   const cache = await loadCache();
   const now = Date.now();
+  const expiry = await getCacheExpiry();
   let total = 0;
   let expired = 0;
   let valid = 0;
 
   for (const value of Object.values(cache)) {
     total++;
-    if (now - value.timestamp >= CACHE_EXPIRY) {
+    if (now - value.timestamp >= expiry) {
       expired++;
     } else {
       valid++;
@@ -194,6 +239,7 @@ async function clearCache() {
 // Reset internal state between tests. Not for production use.
 function __resetForTesting() {
   _cacheDirEnsured = false;
+  _cachedExpiry = null;
 }
 
 export {

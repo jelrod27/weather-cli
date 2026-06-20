@@ -75,6 +75,23 @@ async function setDefaultUnits(units) {
   await saveConfig(config);
 }
 
+// Get configurable cache TTL (in minutes). Returns null if not set.
+async function getCacheTtl() {
+  const config = await loadConfig();
+  return config.cacheTtl ?? null;
+}
+
+// Set configurable cache TTL (in minutes). Pass null to reset to default.
+async function setCacheTtl(minutes) {
+  const config = await loadConfig();
+  if (minutes === null) {
+    delete config.cacheTtl;
+  } else {
+    config.cacheTtl = minutes;
+  }
+  await saveConfig(config);
+}
+
 // Process temperature options from command line
 function processTemperatureOptions(options) {
   if (options.celsius) return 'celsius';
@@ -102,6 +119,8 @@ export {
   getDefaultUnits,
   setDefaultLocation,
   setDefaultUnits,
+  getCacheTtl,
+  setCacheTtl,
   processTemperatureOptions,
   getAsciiConfig,
   __resetForTesting
