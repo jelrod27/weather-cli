@@ -37,6 +37,80 @@ const COUNTRY_ALIASES = {
   HKG: 'HK'
 };
 
+// US state codes + DC — recognized as admin1 hints, not country codes.
+// Without this, "San Ramon, CA" would treat CA as country code "CA" (Canada)
+// instead of California, US.
+const US_STATE_CODES = new Set([
+  'AL',
+  'AK',
+  'AZ',
+  'AR',
+  'CA',
+  'CO',
+  'CT',
+  'DE',
+  'FL',
+  'GA',
+  'HI',
+  'ID',
+  'IL',
+  'IN',
+  'IA',
+  'KS',
+  'KY',
+  'LA',
+  'ME',
+  'MD',
+  'MA',
+  'MI',
+  'MN',
+  'MS',
+  'MO',
+  'MT',
+  'NE',
+  'NV',
+  'NH',
+  'NJ',
+  'NM',
+  'NY',
+  'NC',
+  'ND',
+  'OH',
+  'OK',
+  'OR',
+  'PA',
+  'RI',
+  'SC',
+  'SD',
+  'TN',
+  'TX',
+  'UT',
+  'VT',
+  'VA',
+  'WA',
+  'WV',
+  'WI',
+  'WY',
+  'DC'
+]);
+
+// Canadian province/territory codes — recognized as admin1 for country CA.
+const CA_PROVINCE_CODES = new Set([
+  'ON',
+  'QC',
+  'BC',
+  'AB',
+  'MB',
+  'SK',
+  'NS',
+  'NB',
+  'NL',
+  'PE',
+  'NT',
+  'YT',
+  'NU'
+]);
+
 export function parseLocationQuery(input) {
   const parts = input
     .split(',')
@@ -49,11 +123,23 @@ export function parseLocationQuery(input) {
 
   if (parts.length >= 2) {
     const last = parts[parts.length - 1].toUpperCase();
-    if (last.length <= 3 && /^[A-Z]+$/.test(last)) {
+
+    if (US_STATE_CODES.has(last)) {
+      // "San Ramon, CA" → state hint, country defaults to US
+      country = 'US';
+      admin1 = last;
+    } else if (CA_PROVINCE_CODES.has(last)) {
+      // "Vancouver, BC" → province hint, country is Canada
+      country = 'CA';
+      admin1 = last;
+    } else if (last.length <= 3 && /^[A-Z]+$/.test(last)) {
+      // Generic country code (2 or 3 letters), aliased if informal
       country = COUNTRY_ALIASES[last] || last;
     }
+    // If last part is longer than 3 chars, it's not a code — leave country/admin1 null
   }
-  if (parts.length >= 3) {
+  if (parts.length >= 3 && !admin1) {
+    // "City, State, Country" format — middle part is admin1 hint
     admin1 = parts[1].toUpperCase();
   }
 
