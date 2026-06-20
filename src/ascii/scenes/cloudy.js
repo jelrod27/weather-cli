@@ -1,5 +1,6 @@
 // Cloudy animation frames - drifting clouds
-// 4 frames with subtle cloud movement (all within width 55)
+// 4 frames with cloud positions shifting left/right (all within width 55)
+// Frame 0 is the canonical static display (snapshot-tested).
 
 const cloudyFrame0 = [
   '            .-~~~-.                                  ',
@@ -17,14 +18,15 @@ const cloudyFrame0 = [
   '   |_________|___|__________|=|=|=|=|=|              '
 ];
 
+// Frame 1: top cloud shifts right, bottom cloud shifts left
 const cloudyFrame1 = [
-  '            .-~~~-.                                  ',
-  '      .- ~ ~-(       )- ~                            ',
-  '     /                     \\      .-~~~-.           ',
-  '    |                       |.- ~-(       )- ~       ',
-  '     \\                     /                  \\    ',
-  '       ~- . _____ . -~      \\                /     ',
-  '                               ~- . ___ . -~        ',
+  '             .-~~~-.                                 ',
+  '       .- ~ ~-(       )- ~                           ',
+  '      /                     \\     .-~~~-.           ',
+  '     |                       |.- ~-(       )- ~      ',
+  '      \\                     /                  \\   ',
+  '        ~- . _____ . -~      \\                /     ',
+  '                                ~- . ___ . -~        ',
   '           ( _ _._                                   ',
   "          |_|-'_~_`-._                              ",
   "       .-'-_~_-~_-~-_`-._                           ",
@@ -33,14 +35,15 @@ const cloudyFrame1 = [
   '   |_________|___|__________|=|=|=|=|=|              '
 ];
 
+// Frame 2: clouds shift further in same direction
 const cloudyFrame2 = [
-  '            .-~~~-.                                  ',
-  '      .- ~ ~-(       )- ~                            ',
-  '     /                     \\      .-~~~-.           ',
-  '    |                       |.- ~-(       )- ~       ',
-  '     \\                     /                  \\    ',
-  '       ~- . _____ . -~      \\                /     ',
-  '                               ~- . ___ . -~        ',
+  '              .-~~~-.                                ',
+  '        .- ~ ~-(       )- ~                          ',
+  '       /                     \\    .-~~~-.           ',
+  '      |                       |.- ~-(       )- ~     ',
+  '       \\                     /                  \\  ',
+  '         ~- . _____ . -~      \\                /     ',
+  '                                 ~- . ___ . -~        ',
   '           ( _ _._                                   ',
   "          |_|-'_~_`-._                              ",
   "       .-'-_~_-~_-~-_`-._                           ",
@@ -49,14 +52,15 @@ const cloudyFrame2 = [
   '   |_________|___|__________|=|=|=|=|=|              '
 ];
 
+// Frame 3: clouds drift back (slightly past center)
 const cloudyFrame3 = [
-  '            .-~~~-.                                  ',
-  '      .- ~ ~-(       )- ~                            ',
-  '     /                     \\      .-~~~-.           ',
-  '    |                       |.- ~-(       )- ~       ',
-  '     \\                     /                  \\    ',
-  '       ~- . _____ . -~      \\                /     ',
-  '                               ~- . ___ . -~        ',
+  '             .-~~~-.                                 ',
+  '       .- ~ ~-(       )- ~                           ',
+  '      /                     \\     .-~~~-.           ',
+  '     |                       |.- ~-(       )- ~      ',
+  '      \\                     /                  \\   ',
+  '        ~- . _____ . -~      \\                /     ',
+  '                                ~- . ___ . -~        ',
   '           ( _ _._                                   ',
   "          |_|-'_~_`-._                              ",
   "       .-'-_~_-~_-~-_`-._                           ",

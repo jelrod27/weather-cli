@@ -1,5 +1,6 @@
 // Sunny animation frames - pulsing sun rays
-// 4 frames with subtle ray movement (all within width 55)
+// 4 frames with ray rotation and subtle sun pulse (all within width 55)
+// Frame 0 is the canonical static display (snapshot-tested).
 
 const sunnyFrame0 = [
   '       \\   |   /                                    ',
@@ -17,12 +18,13 @@ const sunnyFrame0 = [
   '   |_________|___|__________|=|=|=|=|=|              '
 ];
 
+// Frame 1: rays swap direction (mirror), sun squints
 const sunnyFrame1 = [
-  '       \\   |   /                                    ',
+  '       /   |   \\                                    ',
   '        .---.                                        ',
-  '     --( o o )--                                     ',
+  '     --( - - )--                                     ',
   "        `---'            .-~~~-.                     ",
-  '       /   |   \\   .- ~ ~-(       )- ~              ',
+  '       \\   |   /   .- ~ ~-(       )- ~              ',
   '                   /                     \\           ',
   '                          ~                            ',
   '           ( _ _._                                   ',
@@ -33,12 +35,13 @@ const sunnyFrame1 = [
   '   |_________|___|__________|=|=|=|=|=|              '
 ];
 
+// Frame 2: rays spread wider, sun opens eyes
 const sunnyFrame2 = [
-  '       \\   |   /                                    ',
+  '      \\    |    /                                    ',
   '        .---.                                        ',
   '     --( o o )--                                     ',
   "        `---'            .-~~~-.                     ",
-  '       /   |   \\   .- ~ ~-(       )- ~              ',
+  '       /    |    \\   .- ~ ~-(       )- ~              ',
   '                   /                     \\           ',
   '                          ~                            ',
   '           ( _ _._                                   ',
@@ -49,12 +52,13 @@ const sunnyFrame2 = [
   '   |_________|___|__________|=|=|=|=|=|              '
 ];
 
+// Frame 3: rays swap back, sun squints again
 const sunnyFrame3 = [
-  '       \\   |   /                                    ',
+  '      /    |    \\                                    ',
   '        .---.                                        ',
-  '     --( o o )--                                     ',
+  '     --( - - )--                                     ',
   "        `---'            .-~~~-.                     ",
-  '       /   |   \\   .- ~ ~-(       )- ~              ',
+  '       \\    |    /   .- ~ ~-(       )- ~              ',
   '                   /                     \\           ',
   '                          ~                            ',
   '           ( _ _._                                   ',
