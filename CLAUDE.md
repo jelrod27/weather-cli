@@ -63,7 +63,7 @@ Single shared `axios` instance with 5 s timeout, `User-Agent: weather-cli/<versi
 
 ### Cache (src/cache.js)
 
-JSON file in the XDG cache directory: `~/.cache/weather-cli/cache.json` (or `$XDG_CACHE_HOME/weather-cli/cache.json`). 30-min entry expiry, 100-entry cap, 7-day hard max age, in-memory `accessOrder` array for LRU eviction. `accessOrder` is module-scoped so it's only meaningful within a single CLI invocation — across invocations LRU degrades to "first 100 surviving entries kept."
+JSON file in the XDG cache directory: `~/.cache/weather-cli/cache.json` (or `$XDG_CACHE_HOME/weather-cli/cache.json`). Entry expiry defaults to 30 min (configurable via `cacheTtl` in config), 100-entry cap, 7-day hard max age, and persisted `lastAccessed` timestamps to support LRU-style eviction across CLI invocations.
 
 Each cache entry carries a `schemaVersion` field. Bump `CACHE_SCHEMA_VERSION` in `src/cache.js` whenever the cached `data` shape changes — older entries are silently skipped on read. Current value: `3`.
 
@@ -73,7 +73,7 @@ Each cache entry carries a `schemaVersion` field. Bump `CACHE_SCHEMA_VERSION` in
 
 ### Config (src/config.js)
 
-JSON file in the XDG config directory: `~/.config/weather-cli/config.json` (or `$XDG_CONFIG_HOME/weather-cli/config.json`). Stores `defaultLocation`, `defaultUnits`, and `ascii: { enabled, style }`. `processTemperatureOptions()` is the single source of truth for resolving CLI flags into a unit string — call it instead of inspecting `options.celsius`/`options.fahrenheit`/`options.units` directly.
+JSON file in the XDG config directory: `~/.config/weather-cli/config.json` (or `$XDG_CONFIG_HOME/weather-cli/config.json`). Stores `defaultLocation`, `defaultUnits`, optional `cacheTtl`, and `ascii: { enabled, style }`. `processTemperatureOptions()` is the single source of truth for resolving CLI flags into a unit string — call it instead of inspecting `options.celsius`/`options.fahrenheit`/`options.units` directly.
 
 ## CI / publish flow
 

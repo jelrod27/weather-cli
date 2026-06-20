@@ -124,11 +124,11 @@ export function parseLocationQuery(input) {
   if (parts.length >= 2) {
     const last = parts[parts.length - 1].toUpperCase();
 
-    if (US_STATE_CODES.has(last)) {
+    if (parts.length === 2 && US_STATE_CODES.has(last)) {
       // "San Ramon, CA" → state hint, country defaults to US
       country = 'US';
       admin1 = last;
-    } else if (CA_PROVINCE_CODES.has(last)) {
+    } else if (parts.length === 2 && CA_PROVINCE_CODES.has(last)) {
       // "Vancouver, BC" → province hint, country is Canada
       country = 'CA';
       admin1 = last;
@@ -138,7 +138,7 @@ export function parseLocationQuery(input) {
     }
     // If last part is longer than 3 chars, it's not a code — leave country/admin1 null
   }
-  if (parts.length >= 3 && !admin1) {
+  if (parts.length >= 3) {
     // "City, State, Country" format — middle part is admin1 hint
     admin1 = parts[1].toUpperCase();
   }

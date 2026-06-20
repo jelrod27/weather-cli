@@ -113,6 +113,17 @@ describe('parseLocationQuery', () => {
     expect(result.country).toBe('US');
     expect(result.admin1).toBe('CA');
   });
+
+  it('respects explicit country in 3-part input over state-code overlap', () => {
+    // "Toronto, ON, CA" → country=CA (Canada), admin1=ON
+    // Without the parts.length === 2 guard, CA would match US_STATE_CODES
+    // and incorrectly resolve to country=US, admin1=CA
+    expect(parseLocationQuery('Toronto, ON, CA')).toEqual({
+      name: 'Toronto',
+      country: 'CA',
+      admin1: 'ON'
+    });
+  });
 });
 
 describe('normalizeToOwmShape', () => {

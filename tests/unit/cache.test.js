@@ -488,10 +488,8 @@ describe('LRU eviction across invocations', () => {
 
     expect(result).toEqual({ current: { temp: 20 } });
 
-    // lastAccessed should NOT have been updated — the value stays at 1 min ago
-    const writtenContent = fs.writeFile.mock.calls[0][1];
-    const parsed = JSON.parse(writtenContent);
-    expect(parsed['London-auto'].lastAccessed).toBe(now - 1 * 60 * 1000);
+    // No write should occur when access is within threshold
+    expect(fs.writeFile).not.toHaveBeenCalled();
   });
 
   it('getCachedWeather does not update lastAccessed on miss', async () => {
@@ -502,10 +500,8 @@ describe('LRU eviction across invocations', () => {
     const result = await getCachedWeather('Unknown', 'auto');
     expect(result).toBeNull();
 
-    // mergeAndSave still writes the cache, but no entry was modified
-    const writtenContent = fs.writeFile.mock.calls[0][1];
-    const parsed = JSON.parse(writtenContent);
-    expect(Object.keys(parsed)).toHaveLength(0);
+    // No write should occur on a cache miss
+    expect(fs.writeFile).not.toHaveBeenCalled();
   });
 });
 

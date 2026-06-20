@@ -135,25 +135,34 @@ async function getCachedWeather(location, units) {
   const key = `${location}-${units}`;
   const expiry = await getCacheExpiry();
 
-  let hitData = null;
+  // Read-only path: check cache without writing.
+  // We only trigger a write (to update lastAccessed) if the threshold has
+  // been exceeded, avoiding unnecessary disk I/O on every cache hit.
+  const diskCache = await loadCache();
+  const cached = diskCache[key];
+  if (
+    !cached ||
+    cached.schemaVersion !== CACHE_SCHEMA_VERSION ||
+    Date.now() - cached.timestamp >= expiry
+  ) {
+    return null;
+  }
 
-  await mergeAndSaveCache((diskCache) => {
-    const cached = diskCache[key];
-    if (
-      cached &&
-      cached.schemaVersion === CACHE_SCHEMA_VERSION &&
-      Date.now() - cached.timestamp < expiry
-    ) {
-      hitData = cached.data;
-      const now = Date.now();
-      const lastAccessed = cached.lastAccessed ?? cached.timestamp;
-      // Only update lastAccessed if it's stale enough to warrant a write
-      if (now - lastAccessed >= LAST_ACCESSED_UPDATE_THRESHOLD) {
-        diskCache[key] = { ...cached, lastAccessed: now };
+  const hitData = cached.data;
+
+  // Only write if lastAccessed is stale enough to warrant it
+  const now = Date.now();
+  const lastAccessed = cached.lastAccessed ?? cached.timestamp;
+  if (now - lastAccessed >= LAST_ACCESSED_UPDATE_THRESHOLD) {
+    await mergeAndSaveCache((dc) => {
+      // Re-read from disk inside merge to pick up concurrent writes
+      const entry = dc[key];
+      if (entry) {
+        dc[key] = { ...entry, lastAccessed: now };
       }
-    }
-    return diskCache;
-  });
+      return dc;
+    });
+  }
 
   return hitData;
 }

@@ -313,12 +313,18 @@ program
         name: 'cacheTtl',
         message: 'Cache TTL in minutes (1-1440, blank for default 30):',
         default: currentTtl ? String(currentTtl) : '',
+        validate: (input) => {
+          const trimmed = input.trim();
+          if (!trimmed) return true;
+          const num = Number.parseInt(trimmed, 10);
+          return Number.isInteger(num) && num >= 1 && num <= 1440
+            ? true
+            : 'Enter a number between 1 and 1440, or leave blank for default.';
+        },
         filter: (input) => {
           const trimmed = input.trim();
           if (!trimmed) return null;
-          const num = parseInt(trimmed, 10);
-          if (isNaN(num) || num < 1 || num > 1440) return null;
-          return num;
+          return Number.parseInt(trimmed, 10);
         }
       }
     ]);
