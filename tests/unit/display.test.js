@@ -8,6 +8,7 @@ import {
   formatRelativeTime,
   degToCardinal,
   getAirQualityDescription,
+  formatUvIndex,
   createDataRow,
   displayAlerts,
   displayMinutelyForecast
@@ -391,5 +392,75 @@ describe('formatTemp null handling', () => {
 
   it('returns N/A for NaN', () => {
     expect(formatTemp(NaN, 'celsius')).toBe('N/A');
+  });
+});
+
+describe('formatUvIndex', () => {
+  it('returns "N/A" for null', () => {
+    expect(formatUvIndex(null)).toBe('N/A');
+  });
+
+  it('returns "N/A" for undefined', () => {
+    expect(formatUvIndex(undefined)).toBe('N/A');
+  });
+
+  it('returns "N/A" for NaN', () => {
+    expect(formatUvIndex(NaN)).toBe('N/A');
+  });
+
+  it('returns Low for value 0', () => {
+    expect(formatUvIndex(0)).toBe('0 (Low)');
+  });
+
+  it('returns Low for value 1', () => {
+    expect(formatUvIndex(1)).toBe('1 (Low)');
+  });
+
+  it('returns Low for value 2', () => {
+    expect(formatUvIndex(2)).toBe('2 (Low)');
+  });
+
+  it('returns Moderate for value 3', () => {
+    expect(formatUvIndex(3)).toBe('3 (Moderate)');
+  });
+
+  it('returns Moderate for value 5', () => {
+    expect(formatUvIndex(5)).toBe('5 (Moderate)');
+  });
+
+  it('returns High for value 6', () => {
+    expect(formatUvIndex(6)).toBe('6 (High)');
+  });
+
+  it('returns High for value 7', () => {
+    expect(formatUvIndex(7)).toBe('7 (High)');
+  });
+
+  it('returns Very High for value 8', () => {
+    expect(formatUvIndex(8)).toBe('8 (Very High)');
+  });
+
+  it('returns Very High for value 10', () => {
+    expect(formatUvIndex(10)).toBe('10 (Very High)');
+  });
+
+  it('returns Extreme for value 11', () => {
+    expect(formatUvIndex(11)).toBe('11 (Extreme)');
+  });
+
+  it('returns Extreme for value 15', () => {
+    expect(formatUvIndex(15)).toBe('15 (Extreme)');
+  });
+
+  it('handles decimal values', () => {
+    expect(formatUvIndex(7.4)).toBe('7.4 (High)');
+  });
+
+  it('handles decimal value in Moderate range', () => {
+    expect(formatUvIndex(4.5)).toBe('4.5 (Moderate)');
+  });
+
+  it('handles decimal value in Very High range', () => {
+    expect(formatUvIndex(9.3)).toBe('9.3 (Very High)');
   });
 });

@@ -117,6 +117,20 @@ function getAirQualityDescription(aqi) {
   return desc.color(desc.text);
 }
 
+/**
+ * Format UV index value with WHO risk level label.
+ * @param {number|null|undefined} value - UV index value
+ * @returns {string} Formatted string like "7.4 (High)" or "N/A"
+ */
+function formatUvIndex(value) {
+  if (value === null || value === undefined || Number.isNaN(value)) return 'N/A';
+  if (value < 3) return `${value} (Low)`;
+  if (value < 6) return `${value} (Moderate)`;
+  if (value < 8) return `${value} (High)`;
+  if (value < 11) return `${value} (Very High)`;
+  return `${value} (Extreme)`;
+}
+
 /** Return the most frequent value in an array of numbers. */
 function modeValue(arr) {
   const counts = {};
@@ -307,6 +321,7 @@ function displayCurrentWeather(data, displayUnit, options = {}) {
     formatTemp(weather.main.temp, displayUnit, { colorCode: true, type: 'current' }),
     `Feels Like: ${formatFeelsLike(weather.main.feels_like, displayUnit)}`,
     `Humidity:   ${weather.main.humidity}%`,
+    `UV Index:   ${formatUvIndex(weather.uv_index)}`,
     `Pressure:   ${weather.main.pressure} hPa`
   ];
 
@@ -657,6 +672,7 @@ export {
   formatRelativeTime,
   degToCardinal,
   getAirQualityDescription,
+  formatUvIndex,
   displayCurrentWeather,
   display5DayForecast,
   display24HourForecast,
