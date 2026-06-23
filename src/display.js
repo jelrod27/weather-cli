@@ -99,6 +99,30 @@ function formatVisibility(meters, displayUnit) {
   return `${km.toFixed(1)} km`;
 }
 
+/**
+ * Format dew point value with NOAA comfort level label.
+ * @param {number|null|undefined} value - Dew point in Celsius
+ * @param {string} displayUnit - 'celsius' or 'fahrenheit'
+ * @returns {string} Formatted string like "54°F (Dry)" or "N/A"
+ */
+function formatDewPoint(value, displayUnit) {
+  if (value === null || value === undefined || Number.isNaN(value)) return 'N/A';
+  const celsius = value;
+  let comfort;
+  if (celsius < 12.8) comfort = 'Dry';
+  else if (celsius < 15.6) comfort = 'Comfortable';
+  else if (celsius < 18.3) comfort = 'Sticky';
+  else if (celsius < 21.1) comfort = 'Uncomfortable';
+  else if (celsius < 23.9) comfort = 'Oppressive';
+  else comfort = 'Severe';
+
+  if (displayUnit === 'fahrenheit') {
+    const fahrenheit = Math.round((celsius * 9) / 5 + 32);
+    return `${fahrenheit}°F (${comfort})`;
+  }
+  return `${Math.round(celsius)}°C (${comfort})`;
+}
+
 function createDataRow(label, value, options = {}) {
   const { labelWidth = 20, icon = '' } = options;
   const formattedLabel = icon ? `${icon} ${label}` : label;
@@ -322,7 +346,8 @@ function displayCurrentWeather(data, displayUnit, options = {}) {
     `Feels Like: ${formatFeelsLike(weather.main.feels_like, displayUnit)}`,
     `Humidity:   ${weather.main.humidity}%`,
     `UV Index:   ${formatUvIndex(weather.uv_index)}`,
-    `Pressure:   ${weather.main.pressure} hPa`
+    `Pressure:   ${weather.main.pressure} hPa`,
+    `Dew Point:  ${formatDewPoint(weather.dew_point, displayUnit)}`
   ];
 
   const right = [
@@ -678,5 +703,6 @@ export {
   display24HourForecast,
   displayAlerts,
   displayMinutelyForecast,
+  formatDewPoint,
   createDataRow
 };
