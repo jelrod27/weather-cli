@@ -6,6 +6,7 @@ import { renderBrailleLineChart, dataPointColumns, buildLabelRow } from './ascii
 import { weatherEmojis } from './utils/icons.js';
 
 function formatTemp(temp, displayUnit, options = {}) {
+  if (temp === null || temp === undefined || Number.isNaN(temp)) return 'N/A';
   const unit = displayUnit === 'fahrenheit' ? '°F' : '°C';
   const rounded = Math.round(temp);
   const tempString = `${rounded}${unit}`;
@@ -17,6 +18,18 @@ function formatTemp(temp, displayUnit, options = {}) {
   }
 
   return tempString;
+}
+
+function formatFeelsLike(temp, displayUnit) {
+  if (temp === null || temp === undefined || Number.isNaN(temp)) return 'N/A';
+  if (displayUnit === 'fahrenheit') {
+    const f = Math.round(temp);
+    const c = Math.round(((temp - 32) * 5) / 9);
+    return `${f}°F / ${c}°C`;
+  }
+  const c = Math.round(temp);
+  const f = Math.round((temp * 9) / 5 + 32);
+  return `${c}°C / ${f}°F`;
 }
 
 function formatTime(timestamp) {
@@ -292,7 +305,7 @@ function displayCurrentWeather(data, displayUnit, options = {}) {
   const left = [
     chalk.gray(weather.weather[0].description),
     formatTemp(weather.main.temp, displayUnit, { colorCode: true, type: 'current' }),
-    `Feels like: ${formatTemp(weather.main.feels_like, displayUnit)}`,
+    `Feels Like: ${formatFeelsLike(weather.main.feels_like, displayUnit)}`,
     `Humidity:   ${weather.main.humidity}%`,
     `Pressure:   ${weather.main.pressure} hPa`
   ];
@@ -637,6 +650,7 @@ function displayMinutelyForecast(data, _displayUnit) {
 
 export {
   formatTemp,
+  formatFeelsLike,
   formatWindSpeed,
   formatVisibility,
   formatTime,

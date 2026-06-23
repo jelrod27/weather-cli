@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   formatTemp,
+  formatFeelsLike,
   formatWindSpeed,
   formatVisibility,
   formatTime,
@@ -346,5 +347,49 @@ describe('displayMinutelyForecast', () => {
     const output = spy.mock.calls.map((args) => args.join('')).join('\n');
     expect(output).toContain('Precipitation next hour');
     spy.mockRestore();
+  });
+});
+
+describe('formatFeelsLike', () => {
+  it('formats dual units in fahrenheit mode', () => {
+    expect(formatFeelsLike(72, 'fahrenheit')).toBe('72\u00b0F / 22\u00b0C');
+  });
+
+  it('formats dual units in celsius mode', () => {
+    expect(formatFeelsLike(22, 'celsius')).toBe('22\u00b0C / 72\u00b0F');
+  });
+
+  it('handles negative temperatures in fahrenheit mode', () => {
+    expect(formatFeelsLike(-4, 'fahrenheit')).toBe('-4\u00b0F / -20\u00b0C');
+  });
+
+  it('handles zero temperature', () => {
+    expect(formatFeelsLike(0, 'celsius')).toBe('0\u00b0C / 32\u00b0F');
+  });
+
+  it('returns N/A for null', () => {
+    expect(formatFeelsLike(null, 'fahrenheit')).toBe('N/A');
+  });
+
+  it('returns N/A for undefined', () => {
+    expect(formatFeelsLike(undefined, 'celsius')).toBe('N/A');
+  });
+
+  it('returns N/A for NaN', () => {
+    expect(formatFeelsLike(NaN, 'fahrenheit')).toBe('N/A');
+  });
+});
+
+describe('formatTemp null handling', () => {
+  it('returns N/A for null', () => {
+    expect(formatTemp(null, 'celsius')).toBe('N/A');
+  });
+
+  it('returns N/A for undefined', () => {
+    expect(formatTemp(undefined, 'fahrenheit')).toBe('N/A');
+  });
+
+  it('returns N/A for NaN', () => {
+    expect(formatTemp(NaN, 'celsius')).toBe('N/A');
   });
 });
