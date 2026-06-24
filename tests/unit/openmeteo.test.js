@@ -443,4 +443,29 @@ describe('normalizeToOwmShape', () => {
     });
     expect(data.current.dew_point).toBeUndefined();
   });
+
+  it('maps cloud_cover from current weather data', () => {
+    const data = normalizeToOwmShape({
+      place,
+      forecast,
+      airQuality: { current: null, hourly: {}, daily: {} }
+    });
+    expect(data.current.cloud_cover).toBe(40);
+  });
+
+  it('sets cloud_cover to undefined when not present in current weather', () => {
+    const forecastNoCloud = {
+      ...forecast,
+      current: {
+        ...forecast.current,
+        cloud_cover: undefined
+      }
+    };
+    const data = normalizeToOwmShape({
+      place,
+      forecast: forecastNoCloud,
+      airQuality: { current: null, hourly: {}, daily: {} }
+    });
+    expect(data.current.cloud_cover).toBeUndefined();
+  });
 });

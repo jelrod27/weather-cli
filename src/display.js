@@ -347,7 +347,8 @@ function displayCurrentWeather(data, displayUnit, options = {}) {
     `Humidity:   ${weather.main.humidity}%`,
     `UV Index:   ${formatUvIndex(weather.uv_index)}`,
     `Pressure:   ${weather.main.pressure} hPa`,
-    `Dew Point:  ${formatDewPoint(weather.dew_point, displayUnit)}`
+    `Dew Point:  ${formatDewPoint(weather.dew_point, displayUnit)}`,
+    `Cloud Cover: ${weather.cloud_cover ?? 'N/A'}%`
   ];
 
   const right = [

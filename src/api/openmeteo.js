@@ -419,6 +419,7 @@ export function normalizeToOwmShape({ place, forecast, airQuality, windUnit = 'm
       uv_index: cur.uv_index,
       visibility: visibilityMeters,
       dew_point: cur.dew_point_2m,
+      cloud_cover: cur.cloud_cover,
       dt
     },
     forecast: { list },

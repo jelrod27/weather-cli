@@ -12,7 +12,8 @@ import {
   formatDewPoint,
   createDataRow,
   displayAlerts,
-  displayMinutelyForecast
+  displayMinutelyForecast,
+  displayCurrentWeather
 } from '../../src/display.js';
 
 describe('formatTemp', () => {
@@ -533,5 +534,69 @@ describe('formatDewPoint', () => {
 
   it('respects boundary: 23.9 is Severe not Oppressive', () => {
     expect(formatDewPoint(23.9, 'celsius')).toBe('24°C (Severe)');
+  });
+});
+
+describe('displayCurrentWeather - Cloud Cover', () => {
+  it('displays Cloud Cover in the output', () => {
+    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const data = {
+      current: {
+        name: 'Test City',
+        sys: { country: 'US', sunrise: 1700000000, sunset: 1700040000 },
+        main: {
+          temp: 72,
+          feels_like: 70,
+          humidity: 55,
+          pressure: 1015,
+          temp_min: 52,
+          temp_max: 76
+        },
+        wind: { speed: 5, deg: 270, gust: 9 },
+        weather: [{ id: 802, main: 'Clouds', description: 'partly cloudy' }],
+        uv_index: 5,
+        visibility: 12000,
+        dew_point: 14,
+        cloud_cover: 40
+      },
+      pollution: { list: [{ main: { aqi: 1 } }] },
+      windUnit: 'ms'
+    };
+    displayCurrentWeather(data, 'celsius');
+    const output = spy.mock.calls.map((args) => args.join('')).join('\n');
+    expect(output).toContain('Cloud Cover');
+    expect(output).toContain('40%');
+    spy.mockRestore();
+  });
+
+  it('displays N/A for Cloud Cover when null', () => {
+    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const data = {
+      current: {
+        name: 'Test City',
+        sys: { country: 'US', sunrise: 1700000000, sunset: 1700040000 },
+        main: {
+          temp: 72,
+          feels_like: 70,
+          humidity: 55,
+          pressure: 1015,
+          temp_min: 52,
+          temp_max: 76
+        },
+        wind: { speed: 5, deg: 270, gust: 9 },
+        weather: [{ id: 802, main: 'Clouds', description: 'partly cloudy' }],
+        uv_index: 5,
+        visibility: 12000,
+        dew_point: 14,
+        cloud_cover: null
+      },
+      pollution: { list: [{ main: { aqi: 1 } }] },
+      windUnit: 'ms'
+    };
+    displayCurrentWeather(data, 'celsius');
+    const output = spy.mock.calls.map((args) => args.join('')).join('\n');
+    expect(output).toContain('Cloud Cover');
+    expect(output).toContain('N/A%');
+    spy.mockRestore();
   });
 });
