@@ -212,9 +212,14 @@ export async function fetchForecast(lat, lon, { tempUnit, windUnit, includeMinut
       'relative_humidity_2m',
       'visibility'
     ].join(','),
-    daily: ['weather_code', 'temperature_2m_max', 'temperature_2m_min', 'sunrise', 'sunset'].join(
-      ','
-    ),
+    daily: [
+      'weather_code',
+      'temperature_2m_max',
+      'temperature_2m_min',
+      'sunrise',
+      'sunset',
+      'precipitation_probability'
+    ].join(','),
     timezone: 'auto',
     forecast_days: 6,
     temperature_unit: tempUnit,
@@ -420,6 +425,7 @@ export function normalizeToOwmShape({ place, forecast, airQuality, windUnit = 'm
       visibility: visibilityMeters,
       dew_point: cur.dew_point_2m,
       cloud_cover: cur.cloud_cover,
+      precip_probability: daily.precipitation_probability?.[0],
       dt
     },
     forecast: { list },
