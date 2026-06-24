@@ -207,6 +207,13 @@ function formatDaylight(sunrise, sunset) {
   return `${hours}h ${minutes}m`;
 }
 
+function formatPressureTrend(trend, delta) {
+  if (trend === null || trend === undefined) return '';
+  if (trend === 'rising') return chalk.blue(`(↑ +${Math.abs(delta).toFixed(1)})`);
+  if (trend === 'falling') return chalk.red(`(↓ -${Math.abs(delta).toFixed(1)})`);
+  return chalk.gray(`(→ ±${Math.abs(delta).toFixed(1)})`);
+}
+
 /** Return the most frequent value in an array of numbers. */
 function modeValue(arr) {
   const counts = {};
@@ -398,7 +405,7 @@ function displayCurrentWeather(data, displayUnit, options = {}) {
     `Feels Like: ${formatFeelsLike(weather.main.feels_like, displayUnit)}`,
     `Humidity:   ${weather.main.humidity}%`,
     `UV Index:   ${formatUvIndex(weather.uv_index)}`,
-    `Pressure:   ${weather.main.pressure} hPa`,
+    `Pressure:   ${weather.main.pressure} hPa ${formatPressureTrend(weather.pressure_trend?.trend, weather.pressure_trend?.delta)}`,
     `Dew Point:  ${formatDewPoint(weather.dew_point, displayUnit)}`,
     `Cloud Cover: ${weather.cloud_cover ?? 'N/A'}%`,
     `Rain Chance:  ${formatPrecipProbability(weather.precip_probability)}%`
@@ -762,5 +769,6 @@ export {
   formatPrecipProbability,
   formatWindDescription,
   formatDaylight,
+  formatPressureTrend,
   createDataRow
 };

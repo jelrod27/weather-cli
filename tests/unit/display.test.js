@@ -13,6 +13,7 @@ import {
   formatPrecipProbability,
   formatWindDescription,
   formatDaylight,
+  formatPressureTrend,
   createDataRow,
   displayAlerts,
   displayMinutelyForecast,
@@ -735,5 +736,40 @@ describe('formatDaylight', () => {
 
   it('returns "N/A" for negative duration (sunset before sunrise)', () => {
     expect(formatDaylight(1700030000, 1699990000)).toBe('N/A');
+  });
+});
+
+describe('formatPressureTrend', () => {
+  it('returns empty string for null trend', () => {
+    expect(formatPressureTrend(null, 1.0)).toBe('');
+  });
+
+  it('returns empty string for undefined trend', () => {
+    expect(formatPressureTrend(undefined, 1.0)).toBe('');
+  });
+
+  it('returns blue rising indicator for rising trend', () => {
+    const result = formatPressureTrend('rising', 2.1);
+    expect(result).toContain('↑');
+    expect(result).toContain('+2.1');
+  });
+
+  it('returns red falling indicator for falling trend', () => {
+    const result = formatPressureTrend('falling', -3.2);
+    expect(result).toContain('↓');
+    expect(result).toContain('3.2');
+  });
+
+  it('returns gray steady indicator for steady trend', () => {
+    const result = formatPressureTrend('steady', 0.1);
+    expect(result).toContain('→');
+    expect(result).toContain('0.1');
+  });
+
+  it('uses absolute value for delta display', () => {
+    const rising = formatPressureTrend('rising', 5.0);
+    expect(rising).toContain('+5.0');
+    const falling = formatPressureTrend('falling', -5.0);
+    expect(falling).toContain('5.0');
   });
 });
