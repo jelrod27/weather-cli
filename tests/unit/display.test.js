@@ -14,6 +14,7 @@ import {
   formatWindDescription,
   formatDaylight,
   formatPressureTrend,
+  formatMoonPhase,
   createDataRow,
   displayAlerts,
   displayMinutelyForecast,
@@ -771,5 +772,30 @@ describe('formatPressureTrend', () => {
     expect(rising).toContain('+5.0');
     const falling = formatPressureTrend('falling', -5.0);
     expect(falling).toContain('5.0');
+  });
+});
+
+describe('formatMoonPhase', () => {
+  it('returns N/A for null input', () => {
+    expect(formatMoonPhase(null)).toBe('N/A');
+  });
+
+  it('returns N/A for undefined input', () => {
+    expect(formatMoonPhase(undefined)).toBe('N/A');
+  });
+
+  it('formats a valid moon phase object', () => {
+    const moonData = { emoji: '🌕', name: 'Full Moon', illumination: 100, phase: 0.5 };
+    const result = formatMoonPhase(moonData);
+    expect(result).toContain('Full Moon');
+    expect(result).toContain('100%');
+    expect(result).toContain('illuminated');
+  });
+
+  it('formats a crescent moon correctly', () => {
+    const moonData = { emoji: '🌒', name: 'Waxing Crescent', illumination: 15, phase: 0.0625 };
+    const result = formatMoonPhase(moonData);
+    expect(result).toContain('Waxing Crescent');
+    expect(result).toContain('15%');
   });
 });
