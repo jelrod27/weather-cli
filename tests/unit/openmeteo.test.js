@@ -361,4 +361,35 @@ describe('normalizeToOwmShape', () => {
     });
     expect(data.minutely).toEqual({});
   });
+
+  describe('feels_like edge cases', () => {
+    it('handles null apparent_temperature', () => {
+      const data = normalizeToOwmShape({
+        place,
+        forecast: {
+          ...forecast,
+          current: {
+            ...forecast.current,
+            apparent_temperature: null
+          }
+        },
+        airQuality: { current: null, hourly: {}, daily: {} }
+      });
+      expect(data.current.main.feels_like).toBeNull();
+    });
+
+    it('handles missing apparent_temperature', () => {
+      const currentWithoutApparent = { ...forecast.current };
+      delete currentWithoutApparent.apparent_temperature;
+      const data = normalizeToOwmShape({
+        place,
+        forecast: {
+          ...forecast,
+          current: currentWithoutApparent
+        },
+        airQuality: { current: null, hourly: {}, daily: {} }
+      });
+      expect(data.current.main.feels_like).toBeUndefined();
+    });
+  });
 });
