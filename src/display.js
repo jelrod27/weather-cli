@@ -155,6 +155,58 @@ function formatUvIndex(value) {
   return `${value} (Extreme)`;
 }
 
+/**
+ * Format precipitation probability value.
+ * @param {number|null|undefined} value - Precipitation probability (0-100)
+ * @returns {string} Formatted value or "N/A"
+ */
+function formatPrecipProbability(value) {
+  if (value === null || value === undefined || Number.isNaN(value)) return 'N/A';
+  return String(value);
+}
+
+/**
+ * Format wind speed as a Beaufort scale description.
+ * @param {number|null|undefined} speed - Wind speed
+ * @param {string} windUnit - 'ms', 'mph', or 'kn'
+ * @returns {string} Beaufort description or "N/A"
+ */
+function formatWindDescription(speed, windUnit) {
+  if (speed === null || speed === undefined || Number.isNaN(speed)) return 'N/A';
+  let ms = speed;
+  if (windUnit === 'mph') ms = speed * 0.44704;
+  else if (windUnit === 'kn') ms = speed * 0.51444;
+  if (ms < 0.5) return 'Calm';
+  if (ms < 1.5) return 'Light air';
+  if (ms < 3.3) return 'Light breeze';
+  if (ms < 5.5) return 'Gentle breeze';
+  if (ms < 7.9) return 'Moderate breeze';
+  if (ms < 10.7) return 'Fresh breeze';
+  if (ms < 13.8) return 'Strong breeze';
+  if (ms < 17.1) return 'High wind';
+  if (ms < 20.7) return 'Gale';
+  if (ms < 24.4) return 'Strong gale';
+  if (ms < 28.4) return 'Storm';
+  if (ms < 32.6) return 'Violent storm';
+  return 'Hurricane';
+}
+
+/**
+ * Format daylight duration from sunrise and sunset timestamps.
+ * @param {number|null|undefined} sunrise - Unix timestamp (seconds)
+ * @param {number|null|undefined} sunset - Unix timestamp (seconds)
+ * @returns {string} Duration like "14h 22m" or "N/A"
+ */
+function formatDaylight(sunrise, sunset) {
+  if (sunrise === null || sunrise === undefined || Number.isNaN(sunrise)) return 'N/A';
+  if (sunset === null || sunset === undefined || Number.isNaN(sunset)) return 'N/A';
+  const diff = sunset - sunrise;
+  if (diff < 0) return 'N/A';
+  const hours = Math.floor(diff / 3600);
+  const minutes = Math.floor((diff % 3600) / 60);
+  return `${hours}h ${minutes}m`;
+}
+
 /** Return the most frequent value in an array of numbers. */
 function modeValue(arr) {
   const counts = {};
@@ -347,15 +399,18 @@ function displayCurrentWeather(data, displayUnit, options = {}) {
     `Humidity:   ${weather.main.humidity}%`,
     `UV Index:   ${formatUvIndex(weather.uv_index)}`,
     `Pressure:   ${weather.main.pressure} hPa`,
-    `Dew Point:  ${formatDewPoint(weather.dew_point, displayUnit)}`
+    `Dew Point:  ${formatDewPoint(weather.dew_point, displayUnit)}`,
+    `Cloud Cover: ${weather.cloud_cover ?? 'N/A'}%`,
+    `Rain Chance:  ${formatPrecipProbability(weather.precip_probability)}%`
   ];
 
   const right = [
     `Sunrise:     ${formatTime(weather.sys.sunrise)} (${formatRelativeTime(weather.sys.sunrise)})`,
     `Sunset:      ${formatTime(weather.sys.sunset)} (${formatRelativeTime(weather.sys.sunset)})`,
+    `Daylight:    ${formatDaylight(weather.sys.sunrise, weather.sys.sunset)}`,
     aqi ? `Air Quality: ${getAirQualityDescription(aqi)} (AQI: ${aqi})` : '',
     `Min/Max:     ${formatTemp(weather.main.temp_min, displayUnit, { colorCode: true, type: 'min' })} / ${formatTemp(weather.main.temp_max, displayUnit, { colorCode: true, type: 'max' })}`,
-    `Wind:        ${wind}`,
+    `Wind:        ${wind} (${formatWindDescription(weather.wind.speed, windUnit)})`,
     `Visibility:  ${visFormatted}`
   ].filter(Boolean);
 
@@ -704,5 +759,8 @@ export {
   displayAlerts,
   displayMinutelyForecast,
   formatDewPoint,
+  formatPrecipProbability,
+  formatWindDescription,
+  formatDaylight,
   createDataRow
 };

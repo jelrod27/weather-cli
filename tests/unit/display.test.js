@@ -10,9 +10,13 @@ import {
   getAirQualityDescription,
   formatUvIndex,
   formatDewPoint,
+  formatPrecipProbability,
+  formatWindDescription,
+  formatDaylight,
   createDataRow,
   displayAlerts,
-  displayMinutelyForecast
+  displayMinutelyForecast,
+  displayCurrentWeather
 } from '../../src/display.js';
 
 describe('formatTemp', () => {
@@ -533,5 +537,203 @@ describe('formatDewPoint', () => {
 
   it('respects boundary: 23.9 is Severe not Oppressive', () => {
     expect(formatDewPoint(23.9, 'celsius')).toBe('24°C (Severe)');
+  });
+});
+
+describe('displayCurrentWeather - Cloud Cover', () => {
+  it('displays Cloud Cover in the output', () => {
+    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const data = {
+      current: {
+        name: 'Test City',
+        sys: { country: 'US', sunrise: 1700000000, sunset: 1700040000 },
+        main: {
+          temp: 72,
+          feels_like: 70,
+          humidity: 55,
+          pressure: 1015,
+          temp_min: 52,
+          temp_max: 76
+        },
+        wind: { speed: 5, deg: 270, gust: 9 },
+        weather: [{ id: 802, main: 'Clouds', description: 'partly cloudy' }],
+        uv_index: 5,
+        visibility: 12000,
+        dew_point: 14,
+        cloud_cover: 40
+      },
+      pollution: { list: [{ main: { aqi: 1 } }] },
+      windUnit: 'ms'
+    };
+    displayCurrentWeather(data, 'celsius');
+    const output = spy.mock.calls.map((args) => args.join('')).join('\n');
+    expect(output).toContain('Cloud Cover');
+    expect(output).toContain('40%');
+    spy.mockRestore();
+  });
+
+  it('displays N/A for Cloud Cover when null', () => {
+    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const data = {
+      current: {
+        name: 'Test City',
+        sys: { country: 'US', sunrise: 1700000000, sunset: 1700040000 },
+        main: {
+          temp: 72,
+          feels_like: 70,
+          humidity: 55,
+          pressure: 1015,
+          temp_min: 52,
+          temp_max: 76
+        },
+        wind: { speed: 5, deg: 270, gust: 9 },
+        weather: [{ id: 802, main: 'Clouds', description: 'partly cloudy' }],
+        uv_index: 5,
+        visibility: 12000,
+        dew_point: 14,
+        cloud_cover: null
+      },
+      pollution: { list: [{ main: { aqi: 1 } }] },
+      windUnit: 'ms'
+    };
+    displayCurrentWeather(data, 'celsius');
+    const output = spy.mock.calls.map((args) => args.join('')).join('\n');
+    expect(output).toContain('Cloud Cover');
+    expect(output).toContain('N/A%');
+    spy.mockRestore();
+  });
+});
+
+describe('formatPrecipProbability', () => {
+  it('returns "N/A" for null', () => {
+    expect(formatPrecipProbability(null)).toBe('N/A');
+  });
+
+  it('returns "N/A" for undefined', () => {
+    expect(formatPrecipProbability(undefined)).toBe('N/A');
+  });
+
+  it('returns "N/A" for NaN', () => {
+    expect(formatPrecipProbability(NaN)).toBe('N/A');
+  });
+
+  it('returns value as string for 0', () => {
+    expect(formatPrecipProbability(0)).toBe('0');
+  });
+
+  it('returns value as string for 30', () => {
+    expect(formatPrecipProbability(30)).toBe('30');
+  });
+
+  it('returns value as string for 100', () => {
+    expect(formatPrecipProbability(100)).toBe('100');
+  });
+});
+
+describe('formatWindDescription', () => {
+  it('returns "N/A" for null', () => {
+    expect(formatWindDescription(null, 'ms')).toBe('N/A');
+  });
+
+  it('returns "N/A" for undefined', () => {
+    expect(formatWindDescription(undefined, 'ms')).toBe('N/A');
+  });
+
+  it('returns "N/A" for NaN', () => {
+    expect(formatWindDescription(NaN, 'ms')).toBe('N/A');
+  });
+
+  it('returns Calm for 0 m/s', () => {
+    expect(formatWindDescription(0, 'ms')).toBe('Calm');
+  });
+
+  it('returns Light air for 1 m/s', () => {
+    expect(formatWindDescription(1, 'ms')).toBe('Light air');
+  });
+
+  it('returns Light breeze for 2 m/s', () => {
+    expect(formatWindDescription(2, 'ms')).toBe('Light breeze');
+  });
+
+  it('returns Gentle breeze for 4 m/s', () => {
+    expect(formatWindDescription(4, 'ms')).toBe('Gentle breeze');
+  });
+
+  it('returns Moderate breeze for 6 m/s', () => {
+    expect(formatWindDescription(6, 'ms')).toBe('Moderate breeze');
+  });
+
+  it('returns Fresh breeze for 9 m/s', () => {
+    expect(formatWindDescription(9, 'ms')).toBe('Fresh breeze');
+  });
+
+  it('returns Strong breeze for 12 m/s', () => {
+    expect(formatWindDescription(12, 'ms')).toBe('Strong breeze');
+  });
+
+  it('returns High wind for 15 m/s', () => {
+    expect(formatWindDescription(15, 'ms')).toBe('High wind');
+  });
+
+  it('returns Gale for 19 m/s', () => {
+    expect(formatWindDescription(19, 'ms')).toBe('Gale');
+  });
+
+  it('returns Strong gale for 23 m/s', () => {
+    expect(formatWindDescription(23, 'ms')).toBe('Strong gale');
+  });
+
+  it('returns Storm for 27 m/s', () => {
+    expect(formatWindDescription(27, 'ms')).toBe('Storm');
+  });
+
+  it('returns Violent storm for 30 m/s', () => {
+    expect(formatWindDescription(30, 'ms')).toBe('Violent storm');
+  });
+
+  it('returns Hurricane for 33 m/s', () => {
+    expect(formatWindDescription(33, 'ms')).toBe('Hurricane');
+  });
+
+  it('converts mph to m/s correctly (10 mph = Gentle breeze)', () => {
+    expect(formatWindDescription(10, 'mph')).toBe('Gentle breeze');
+  });
+
+  it('converts kn to m/s correctly (10 kn = Gentle breeze)', () => {
+    expect(formatWindDescription(10, 'kn')).toBe('Gentle breeze');
+  });
+});
+
+describe('formatDaylight', () => {
+  it('returns "N/A" for null sunrise', () => {
+    expect(formatDaylight(null, 1700030000)).toBe('N/A');
+  });
+
+  it('returns "N/A" for null sunset', () => {
+    expect(formatDaylight(1699990000, null)).toBe('N/A');
+  });
+
+  it('returns "N/A" for both null', () => {
+    expect(formatDaylight(null, null)).toBe('N/A');
+  });
+
+  it('returns "N/A" for undefined sunrise', () => {
+    expect(formatDaylight(undefined, 1700030000)).toBe('N/A');
+  });
+
+  it('returns "N/A" for NaN sunrise', () => {
+    expect(formatDaylight(NaN, 1700030000)).toBe('N/A');
+  });
+
+  it('calculates daylight duration correctly (11h 6m)', () => {
+    expect(formatDaylight(1699990000, 1700030000)).toBe('11h 6m');
+  });
+
+  it('returns 0h 0m when sunrise equals sunset', () => {
+    expect(formatDaylight(1699990000, 1699990000)).toBe('0h 0m');
+  });
+
+  it('returns "N/A" for negative duration (sunset before sunrise)', () => {
+    expect(formatDaylight(1700030000, 1699990000)).toBe('N/A');
   });
 });
