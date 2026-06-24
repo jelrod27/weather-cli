@@ -1,12 +1,15 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   formatTemp,
+  formatFeelsLike,
   formatWindSpeed,
   formatVisibility,
   formatTime,
   formatRelativeTime,
   degToCardinal,
   getAirQualityDescription,
+  formatUvIndex,
+  formatDewPoint,
   createDataRow,
   displayAlerts,
   displayMinutelyForecast
@@ -346,5 +349,189 @@ describe('displayMinutelyForecast', () => {
     const output = spy.mock.calls.map((args) => args.join('')).join('\n');
     expect(output).toContain('Precipitation next hour');
     spy.mockRestore();
+  });
+});
+
+describe('formatFeelsLike', () => {
+  it('formats dual units in fahrenheit mode', () => {
+    expect(formatFeelsLike(72, 'fahrenheit')).toBe('72\u00b0F / 22\u00b0C');
+  });
+
+  it('formats dual units in celsius mode', () => {
+    expect(formatFeelsLike(22, 'celsius')).toBe('22\u00b0C / 72\u00b0F');
+  });
+
+  it('handles negative temperatures in fahrenheit mode', () => {
+    expect(formatFeelsLike(-4, 'fahrenheit')).toBe('-4\u00b0F / -20\u00b0C');
+  });
+
+  it('handles zero temperature', () => {
+    expect(formatFeelsLike(0, 'celsius')).toBe('0\u00b0C / 32\u00b0F');
+  });
+
+  it('returns N/A for null', () => {
+    expect(formatFeelsLike(null, 'fahrenheit')).toBe('N/A');
+  });
+
+  it('returns N/A for undefined', () => {
+    expect(formatFeelsLike(undefined, 'celsius')).toBe('N/A');
+  });
+
+  it('returns N/A for NaN', () => {
+    expect(formatFeelsLike(NaN, 'fahrenheit')).toBe('N/A');
+  });
+});
+
+describe('formatTemp null handling', () => {
+  it('returns N/A for null', () => {
+    expect(formatTemp(null, 'celsius')).toBe('N/A');
+  });
+
+  it('returns N/A for undefined', () => {
+    expect(formatTemp(undefined, 'fahrenheit')).toBe('N/A');
+  });
+
+  it('returns N/A for NaN', () => {
+    expect(formatTemp(NaN, 'celsius')).toBe('N/A');
+  });
+});
+
+describe('formatUvIndex', () => {
+  it('returns "N/A" for null', () => {
+    expect(formatUvIndex(null)).toBe('N/A');
+  });
+
+  it('returns "N/A" for undefined', () => {
+    expect(formatUvIndex(undefined)).toBe('N/A');
+  });
+
+  it('returns "N/A" for NaN', () => {
+    expect(formatUvIndex(NaN)).toBe('N/A');
+  });
+
+  it('returns Low for value 0', () => {
+    expect(formatUvIndex(0)).toBe('0 (Low)');
+  });
+
+  it('returns Low for value 1', () => {
+    expect(formatUvIndex(1)).toBe('1 (Low)');
+  });
+
+  it('returns Low for value 2', () => {
+    expect(formatUvIndex(2)).toBe('2 (Low)');
+  });
+
+  it('returns Moderate for value 3', () => {
+    expect(formatUvIndex(3)).toBe('3 (Moderate)');
+  });
+
+  it('returns Moderate for value 5', () => {
+    expect(formatUvIndex(5)).toBe('5 (Moderate)');
+  });
+
+  it('returns High for value 6', () => {
+    expect(formatUvIndex(6)).toBe('6 (High)');
+  });
+
+  it('returns High for value 7', () => {
+    expect(formatUvIndex(7)).toBe('7 (High)');
+  });
+
+  it('returns Very High for value 8', () => {
+    expect(formatUvIndex(8)).toBe('8 (Very High)');
+  });
+
+  it('returns Very High for value 10', () => {
+    expect(formatUvIndex(10)).toBe('10 (Very High)');
+  });
+
+  it('returns Extreme for value 11', () => {
+    expect(formatUvIndex(11)).toBe('11 (Extreme)');
+  });
+
+  it('returns Extreme for value 15', () => {
+    expect(formatUvIndex(15)).toBe('15 (Extreme)');
+  });
+
+  it('handles decimal values', () => {
+    expect(formatUvIndex(7.4)).toBe('7.4 (High)');
+  });
+
+  it('handles decimal value in Moderate range', () => {
+    expect(formatUvIndex(4.5)).toBe('4.5 (Moderate)');
+  });
+
+  it('handles decimal value in Very High range', () => {
+    expect(formatUvIndex(9.3)).toBe('9.3 (Very High)');
+  });
+});
+
+describe('formatDewPoint', () => {
+  it('returns "N/A" for null', () => {
+    expect(formatDewPoint(null, 'celsius')).toBe('N/A');
+  });
+
+  it('returns "N/A" for undefined', () => {
+    expect(formatDewPoint(undefined, 'celsius')).toBe('N/A');
+  });
+
+  it('returns "N/A" for NaN', () => {
+    expect(formatDewPoint(NaN, 'celsius')).toBe('N/A');
+  });
+
+  it('returns Dry for value below 12.8 C', () => {
+    expect(formatDewPoint(10, 'celsius')).toBe('10°C (Dry)');
+  });
+
+  it('returns Dry for 12 C (below 12.8 threshold)', () => {
+    expect(formatDewPoint(12, 'celsius')).toBe('12°C (Dry)');
+  });
+
+  it('returns Comfortable for 14 C', () => {
+    expect(formatDewPoint(14, 'celsius')).toBe('14°C (Comfortable)');
+  });
+
+  it('returns Sticky for 17 C', () => {
+    expect(formatDewPoint(17, 'celsius')).toBe('17°C (Sticky)');
+  });
+
+  it('returns Uncomfortable for 20 C', () => {
+    expect(formatDewPoint(20, 'celsius')).toBe('20°C (Uncomfortable)');
+  });
+
+  it('returns Oppressive for 22 C', () => {
+    expect(formatDewPoint(22, 'celsius')).toBe('22°C (Oppressive)');
+  });
+
+  it('returns Severe for 25 C', () => {
+    expect(formatDewPoint(25, 'celsius')).toBe('25°C (Severe)');
+  });
+
+  it('converts to fahrenheit correctly', () => {
+    expect(formatDewPoint(12, 'fahrenheit')).toBe('54°F (Dry)');
+  });
+
+  it('converts to fahrenheit for Sticky range', () => {
+    expect(formatDewPoint(17, 'fahrenheit')).toBe('63°F (Sticky)');
+  });
+
+  it('converts to fahrenheit for Severe range', () => {
+    expect(formatDewPoint(25, 'fahrenheit')).toBe('77°F (Severe)');
+  });
+
+  it('handles decimal values in celsius', () => {
+    expect(formatDewPoint(13.5, 'celsius')).toBe('14°C (Comfortable)');
+  });
+
+  it('handles decimal values in fahrenheit', () => {
+    expect(formatDewPoint(15.6, 'fahrenheit')).toBe('60°F (Sticky)');
+  });
+
+  it('respects boundary: 12.8 is Comfortable not Dry', () => {
+    expect(formatDewPoint(12.8, 'celsius')).toBe('13°C (Comfortable)');
+  });
+
+  it('respects boundary: 23.9 is Severe not Oppressive', () => {
+    expect(formatDewPoint(23.9, 'celsius')).toBe('24°C (Severe)');
   });
 });

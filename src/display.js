@@ -6,6 +6,7 @@ import { renderBrailleLineChart, dataPointColumns, buildLabelRow } from './ascii
 import { weatherEmojis } from './utils/icons.js';
 
 function formatTemp(temp, displayUnit, options = {}) {
+  if (temp === null || temp === undefined || Number.isNaN(temp)) return 'N/A';
   const unit = displayUnit === 'fahrenheit' ? '°F' : '°C';
   const rounded = Math.round(temp);
   const tempString = `${rounded}${unit}`;
@@ -17,6 +18,18 @@ function formatTemp(temp, displayUnit, options = {}) {
   }
 
   return tempString;
+}
+
+function formatFeelsLike(temp, displayUnit) {
+  if (temp === null || temp === undefined || Number.isNaN(temp)) return 'N/A';
+  if (displayUnit === 'fahrenheit') {
+    const f = Math.round(temp);
+    const c = Math.round(((temp - 32) * 5) / 9);
+    return `${f}°F / ${c}°C`;
+  }
+  const c = Math.round(temp);
+  const f = Math.round((temp * 9) / 5 + 32);
+  return `${c}°C / ${f}°F`;
 }
 
 function formatTime(timestamp) {
@@ -86,6 +99,30 @@ function formatVisibility(meters, displayUnit) {
   return `${km.toFixed(1)} km`;
 }
 
+/**
+ * Format dew point value with NOAA comfort level label.
+ * @param {number|null|undefined} value - Dew point in Celsius
+ * @param {string} displayUnit - 'celsius' or 'fahrenheit'
+ * @returns {string} Formatted string like "54°F (Dry)" or "N/A"
+ */
+function formatDewPoint(value, displayUnit) {
+  if (value === null || value === undefined || Number.isNaN(value)) return 'N/A';
+  const celsius = value;
+  let comfort;
+  if (celsius < 12.8) comfort = 'Dry';
+  else if (celsius < 15.6) comfort = 'Comfortable';
+  else if (celsius < 18.3) comfort = 'Sticky';
+  else if (celsius < 21.1) comfort = 'Uncomfortable';
+  else if (celsius < 23.9) comfort = 'Oppressive';
+  else comfort = 'Severe';
+
+  if (displayUnit === 'fahrenheit') {
+    const fahrenheit = Math.round((celsius * 9) / 5 + 32);
+    return `${fahrenheit}°F (${comfort})`;
+  }
+  return `${Math.round(celsius)}°C (${comfort})`;
+}
+
 function createDataRow(label, value, options = {}) {
   const { labelWidth = 20, icon = '' } = options;
   const formattedLabel = icon ? `${icon} ${label}` : label;
@@ -102,6 +139,20 @@ function getAirQualityDescription(aqi) {
   };
   const desc = descriptions[aqi] || { text: 'Unknown', color: chalk.gray };
   return desc.color(desc.text);
+}
+
+/**
+ * Format UV index value with WHO risk level label.
+ * @param {number|null|undefined} value - UV index value
+ * @returns {string} Formatted string like "7.4 (High)" or "N/A"
+ */
+function formatUvIndex(value) {
+  if (value === null || value === undefined || Number.isNaN(value)) return 'N/A';
+  if (value < 3) return `${value} (Low)`;
+  if (value < 6) return `${value} (Moderate)`;
+  if (value < 8) return `${value} (High)`;
+  if (value < 11) return `${value} (Very High)`;
+  return `${value} (Extreme)`;
 }
 
 /** Return the most frequent value in an array of numbers. */
@@ -292,9 +343,11 @@ function displayCurrentWeather(data, displayUnit, options = {}) {
   const left = [
     chalk.gray(weather.weather[0].description),
     formatTemp(weather.main.temp, displayUnit, { colorCode: true, type: 'current' }),
-    `Feels like: ${formatTemp(weather.main.feels_like, displayUnit)}`,
+    `Feels Like: ${formatFeelsLike(weather.main.feels_like, displayUnit)}`,
     `Humidity:   ${weather.main.humidity}%`,
-    `Pressure:   ${weather.main.pressure} hPa`
+    `UV Index:   ${formatUvIndex(weather.uv_index)}`,
+    `Pressure:   ${weather.main.pressure} hPa`,
+    `Dew Point:  ${formatDewPoint(weather.dew_point, displayUnit)}`
   ];
 
   const right = [
@@ -637,16 +690,19 @@ function displayMinutelyForecast(data, _displayUnit) {
 
 export {
   formatTemp,
+  formatFeelsLike,
   formatWindSpeed,
   formatVisibility,
   formatTime,
   formatRelativeTime,
   degToCardinal,
   getAirQualityDescription,
+  formatUvIndex,
   displayCurrentWeather,
   display5DayForecast,
   display24HourForecast,
   displayAlerts,
   displayMinutelyForecast,
+  formatDewPoint,
   createDataRow
 };
