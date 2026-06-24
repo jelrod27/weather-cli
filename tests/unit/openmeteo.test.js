@@ -142,6 +142,7 @@ describe('normalizeToOwmShape', () => {
       temperature_2m: 72,
       apparent_temperature: 70,
       relative_humidity_2m: 55,
+      dew_point_2m: 14,
       pressure_msl: 1015,
       weather_code: 2, // partly cloudy
       is_day: 1,
@@ -416,5 +417,30 @@ describe('normalizeToOwmShape', () => {
       airQuality: { current: null, hourly: {}, daily: {} }
     });
     expect(data.current.uv_index).toBeUndefined();
+  });
+
+  it('maps dew_point from current weather data', () => {
+    const data = normalizeToOwmShape({
+      place,
+      forecast,
+      airQuality: { current: null, hourly: {}, daily: {} }
+    });
+    expect(data.current.dew_point).toBe(14);
+  });
+
+  it('sets dew_point to undefined when not present in current weather', () => {
+    const forecastNoDew = {
+      ...forecast,
+      current: {
+        ...forecast.current,
+        dew_point_2m: undefined
+      }
+    };
+    const data = normalizeToOwmShape({
+      place,
+      forecast: forecastNoDew,
+      airQuality: { current: null, hourly: {}, daily: {} }
+    });
+    expect(data.current.dew_point).toBeUndefined();
   });
 });

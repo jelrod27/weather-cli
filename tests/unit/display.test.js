@@ -9,6 +9,7 @@ import {
   degToCardinal,
   getAirQualityDescription,
   formatUvIndex,
+  formatDewPoint,
   createDataRow,
   displayAlerts,
   displayMinutelyForecast
@@ -462,5 +463,75 @@ describe('formatUvIndex', () => {
 
   it('handles decimal value in Very High range', () => {
     expect(formatUvIndex(9.3)).toBe('9.3 (Very High)');
+  });
+});
+
+describe('formatDewPoint', () => {
+  it('returns "N/A" for null', () => {
+    expect(formatDewPoint(null, 'celsius')).toBe('N/A');
+  });
+
+  it('returns "N/A" for undefined', () => {
+    expect(formatDewPoint(undefined, 'celsius')).toBe('N/A');
+  });
+
+  it('returns "N/A" for NaN', () => {
+    expect(formatDewPoint(NaN, 'celsius')).toBe('N/A');
+  });
+
+  it('returns Dry for value below 12.8 C', () => {
+    expect(formatDewPoint(10, 'celsius')).toBe('10°C (Dry)');
+  });
+
+  it('returns Dry for 12 C (below 12.8 threshold)', () => {
+    expect(formatDewPoint(12, 'celsius')).toBe('12°C (Dry)');
+  });
+
+  it('returns Comfortable for 14 C', () => {
+    expect(formatDewPoint(14, 'celsius')).toBe('14°C (Comfortable)');
+  });
+
+  it('returns Sticky for 17 C', () => {
+    expect(formatDewPoint(17, 'celsius')).toBe('17°C (Sticky)');
+  });
+
+  it('returns Uncomfortable for 20 C', () => {
+    expect(formatDewPoint(20, 'celsius')).toBe('20°C (Uncomfortable)');
+  });
+
+  it('returns Oppressive for 22 C', () => {
+    expect(formatDewPoint(22, 'celsius')).toBe('22°C (Oppressive)');
+  });
+
+  it('returns Severe for 25 C', () => {
+    expect(formatDewPoint(25, 'celsius')).toBe('25°C (Severe)');
+  });
+
+  it('converts to fahrenheit correctly', () => {
+    expect(formatDewPoint(12, 'fahrenheit')).toBe('54°F (Dry)');
+  });
+
+  it('converts to fahrenheit for Sticky range', () => {
+    expect(formatDewPoint(17, 'fahrenheit')).toBe('63°F (Sticky)');
+  });
+
+  it('converts to fahrenheit for Severe range', () => {
+    expect(formatDewPoint(25, 'fahrenheit')).toBe('77°F (Severe)');
+  });
+
+  it('handles decimal values in celsius', () => {
+    expect(formatDewPoint(13.5, 'celsius')).toBe('14°C (Comfortable)');
+  });
+
+  it('handles decimal values in fahrenheit', () => {
+    expect(formatDewPoint(15.6, 'fahrenheit')).toBe('60°F (Sticky)');
+  });
+
+  it('respects boundary: 12.8 is Comfortable not Dry', () => {
+    expect(formatDewPoint(12.8, 'celsius')).toBe('13°C (Comfortable)');
+  });
+
+  it('respects boundary: 23.9 is Severe not Oppressive', () => {
+    expect(formatDewPoint(23.9, 'celsius')).toBe('24°C (Severe)');
   });
 });
