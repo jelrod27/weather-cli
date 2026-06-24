@@ -2,3 +2,5 @@ node_modules/
 coverage/
 .weather-cache.json
 .weather-config.json
+PLAN.md
+STATUS.md

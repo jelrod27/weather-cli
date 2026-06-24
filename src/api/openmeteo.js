@@ -200,7 +200,8 @@ export async function fetchForecast(lat, lon, { tempUnit, windUnit, includeMinut
       'wind_speed_10m',
       'wind_direction_10m',
       'wind_gusts_10m',
-      'cloud_cover'
+      'cloud_cover',
+      'uv_index'
     ].join(','),
     hourly: [
       'temperature_2m',
@@ -414,6 +415,7 @@ export function normalizeToOwmShape({ place, forecast, airQuality, windUnit = 'm
         gust: cur.wind_gusts_10m
       },
       weather: [curWmo],
+      uv_index: cur.uv_index,
       visibility: visibilityMeters,
       dt
     },

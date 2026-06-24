@@ -392,4 +392,29 @@ describe('normalizeToOwmShape', () => {
       expect(data.current.main.feels_like).toBeUndefined();
     });
   });
+
+  it('maps uv_index from current weather data', () => {
+    const forecastWithUv = {
+      ...forecast,
+      current: {
+        ...forecast.current,
+        uv_index: 7.4
+      }
+    };
+    const data = normalizeToOwmShape({
+      place,
+      forecast: forecastWithUv,
+      airQuality: { current: null, hourly: {}, daily: {} }
+    });
+    expect(data.current.uv_index).toBe(7.4);
+  });
+
+  it('sets uv_index to undefined when not present in current weather', () => {
+    const data = normalizeToOwmShape({
+      place,
+      forecast,
+      airQuality: { current: null, hourly: {}, daily: {} }
+    });
+    expect(data.current.uv_index).toBeUndefined();
+  });
 });
