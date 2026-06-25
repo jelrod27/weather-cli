@@ -210,6 +210,7 @@ export async function fetchForecast(lat, lon, { tempUnit, windUnit, includeMinut
       'wind_speed_10m',
       'wind_direction_10m',
       'relative_humidity_2m',
+      'pressure_msl',
       'visibility'
     ].join(','),
     daily: [
@@ -319,6 +320,22 @@ export function normalizeToOwmShape({ place, forecast, airQuality, windUnit = 'm
   const curWmo = wmoToOwm(cur.weather_code);
   const curIdx = nearestHourlyIndex(hourly.time || [], cur.time);
   const visibilityMeters = hourly.visibility?.[curIdx] ?? 10000;
+  // Compute barometric pressure trend (3-hour tendency)
+  const curPressure = cur.pressure_msl ?? null;
+  const hourlyPressures = hourly.pressure_msl || [];
+  let pressureTrend = null;
+  if (
+    curPressure !== null &&
+    curIdx >= 3 &&
+    hourlyPressures[curIdx - 3] !== null &&
+    hourlyPressures[curIdx - 3] !== undefined &&
+    !Number.isNaN(hourlyPressures[curIdx - 3])
+  ) {
+    const pressure3hAgo = hourlyPressures[curIdx - 3];
+    const delta = Math.round((curPressure - pressure3hAgo) * 10) / 10;
+    const trend = delta > 0.5 ? 'rising' : delta < -0.5 ? 'falling' : 'steady';
+    pressureTrend = { trend, delta, pressure_3h_ago: pressure3hAgo };
+  }
 
   const sunriseIso = daily.sunrise?.[0];
   const sunsetIso = daily.sunset?.[0];
@@ -426,6 +443,7 @@ export function normalizeToOwmShape({ place, forecast, airQuality, windUnit = 'm
       dew_point: cur.dew_point_2m,
       cloud_cover: cur.cloud_cover,
       precip_probability: daily.precipitation_probability?.[0],
+      pressure_trend: pressureTrend,
       dt
     },
     forecast: { list },

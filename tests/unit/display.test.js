@@ -13,6 +13,8 @@ import {
   formatPrecipProbability,
   formatWindDescription,
   formatDaylight,
+  formatPressureTrend,
+  formatMoonPhase,
   createDataRow,
   displayAlerts,
   displayMinutelyForecast,
@@ -735,5 +737,65 @@ describe('formatDaylight', () => {
 
   it('returns "N/A" for negative duration (sunset before sunrise)', () => {
     expect(formatDaylight(1700030000, 1699990000)).toBe('N/A');
+  });
+});
+
+describe('formatPressureTrend', () => {
+  it('returns empty string for null trend', () => {
+    expect(formatPressureTrend(null, 1.0)).toBe('');
+  });
+
+  it('returns empty string for undefined trend', () => {
+    expect(formatPressureTrend(undefined, 1.0)).toBe('');
+  });
+
+  it('returns blue rising indicator for rising trend', () => {
+    const result = formatPressureTrend('rising', 2.1);
+    expect(result).toContain('↑');
+    expect(result).toContain('+2.1');
+  });
+
+  it('returns red falling indicator for falling trend', () => {
+    const result = formatPressureTrend('falling', -3.2);
+    expect(result).toContain('↓');
+    expect(result).toContain('3.2');
+  });
+
+  it('returns gray steady indicator for steady trend', () => {
+    const result = formatPressureTrend('steady', 0.1);
+    expect(result).toContain('→');
+    expect(result).toContain('0.1');
+  });
+
+  it('uses absolute value for delta display', () => {
+    const rising = formatPressureTrend('rising', 5.0);
+    expect(rising).toContain('+5.0');
+    const falling = formatPressureTrend('falling', -5.0);
+    expect(falling).toContain('5.0');
+  });
+});
+
+describe('formatMoonPhase', () => {
+  it('returns N/A for null input', () => {
+    expect(formatMoonPhase(null)).toBe('N/A');
+  });
+
+  it('returns N/A for undefined input', () => {
+    expect(formatMoonPhase(undefined)).toBe('N/A');
+  });
+
+  it('formats a valid moon phase object', () => {
+    const moonData = { emoji: '🌕', name: 'Full Moon', illumination: 100, phase: 0.5 };
+    const result = formatMoonPhase(moonData);
+    expect(result).toContain('Full Moon');
+    expect(result).toContain('100%');
+    expect(result).toContain('illuminated');
+  });
+
+  it('formats a crescent moon correctly', () => {
+    const moonData = { emoji: '🌒', name: 'Waxing Crescent', illumination: 15, phase: 0.0625 };
+    const result = formatMoonPhase(moonData);
+    expect(result).toContain('Waxing Crescent');
+    expect(result).toContain('15%');
   });
 });

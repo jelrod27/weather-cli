@@ -180,6 +180,10 @@ describe('normalizeToOwmShape', () => {
       visibility: [
         16000, 16000, 16000, 14000, 12000, 12000, 14000, 16000, 16000, 16000, 16000, 14000, 12000,
         12000, 14000, 16000
+      ],
+      pressure_msl: [
+        1010, 1011, 1012, 1013, 1015, 1016, 1014, 1012, 1011, 1010, 1011, 1012, 1013, 1014, 1013,
+        1012
       ]
     },
     daily: {
@@ -492,5 +496,100 @@ describe('normalizeToOwmShape', () => {
       airQuality: { current: null, hourly: {}, daily: {} }
     });
     expect(data.current.precip_probability).toBeUndefined();
+  });
+
+  it('computes pressure_trend as rising when pressure increased over 3 hours', () => {
+    const data = normalizeToOwmShape({
+      place,
+      forecast,
+      airQuality: { current: null, hourly: {}, daily: {} }
+    });
+    // curIdx = 4 (12:00), curIdx-3 = 1 (03:00), pressure 1011 -> 1015 = +4.0
+    expect(data.current.pressure_trend).toEqual({
+      trend: 'rising',
+      delta: 4.0,
+      pressure_3h_ago: 1011
+    });
+  });
+
+  it('computes pressure_trend as falling when pressure decreased over 3 hours', () => {
+    const fallingForecast = {
+      ...forecast,
+      current: {
+        ...forecast.current,
+        pressure_msl: 1005
+      },
+      hourly: {
+        ...forecast.hourly,
+        pressure_msl: [
+          1013, 1012, 1011, 1010, 1009, 1008, 1007, 1006, 1005, 1004, 1003, 1002, 1001, 1000, 999,
+          998
+        ]
+      }
+    };
+    const data = normalizeToOwmShape({
+      place,
+      forecast: fallingForecast,
+      airQuality: { current: null, hourly: {}, daily: {} }
+    });
+    // curIdx = 4 (12:00), curIdx-3 = 1 (03:00), pressure 1012 -> 1005 = -7.0
+    expect(data.current.pressure_trend.trend).toBe('falling');
+    expect(data.current.pressure_trend.delta).toBe(-7.0);
+  });
+
+  it('computes pressure_trend as steady when pressure change is small', () => {
+    const steadyForecast = {
+      ...forecast,
+      current: {
+        ...forecast.current,
+        pressure_msl: 1015
+      },
+      hourly: {
+        ...forecast.hourly,
+        pressure_msl: [
+          1015, 1015, 1015, 1015, 1015, 1015, 1015, 1015, 1015, 1015, 1015, 1015, 1015, 1015, 1015,
+          1015
+        ]
+      }
+    };
+    const data = normalizeToOwmShape({
+      place,
+      forecast: steadyForecast,
+      airQuality: { current: null, hourly: {}, daily: {} }
+    });
+    expect(data.current.pressure_trend.trend).toBe('steady');
+    expect(data.current.pressure_trend.delta).toBe(0.0);
+  });
+
+  it('sets pressure_trend to null when hourly pressure data is missing', () => {
+    const noPressureForecast = {
+      ...forecast,
+      hourly: {
+        ...forecast.hourly,
+        pressure_msl: undefined
+      }
+    };
+    const data = normalizeToOwmShape({
+      place,
+      forecast: noPressureForecast,
+      airQuality: { current: null, hourly: {}, daily: {} }
+    });
+    expect(data.current.pressure_trend).toBeNull();
+  });
+
+  it('sets pressure_trend to null when curIdx is less than 3', () => {
+    const earlyTimeForecast = {
+      ...forecast,
+      current: {
+        ...forecast.current,
+        time: '2026-04-26T00:00'
+      }
+    };
+    const data = normalizeToOwmShape({
+      place,
+      forecast: earlyTimeForecast,
+      airQuality: { current: null, hourly: {}, daily: {} }
+    });
+    expect(data.current.pressure_trend).toBeNull();
   });
 });

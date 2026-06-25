@@ -3,6 +3,7 @@ import boxen from 'boxen';
 import { getScene, isDaytime } from './ascii/index.js';
 import { AsciiRenderer } from './ascii/renderer.js';
 import { renderBrailleLineChart, dataPointColumns, buildLabelRow } from './ascii/sparkline.js';
+import { getMoonPhase } from './utils/moon.js';
 import { weatherEmojis } from './utils/icons.js';
 
 function formatTemp(temp, displayUnit, options = {}) {
@@ -207,6 +208,18 @@ function formatDaylight(sunrise, sunset) {
   return `${hours}h ${minutes}m`;
 }
 
+function formatPressureTrend(trend, delta) {
+  if (trend === null || trend === undefined) return '';
+  if (trend === 'rising') return chalk.blue(`(↑ +${Math.abs(delta).toFixed(1)})`);
+  if (trend === 'falling') return chalk.red(`(↓ -${Math.abs(delta).toFixed(1)})`);
+  return chalk.gray(`(→ ±${Math.abs(delta).toFixed(1)})`);
+}
+
+function formatMoonPhase(moonData) {
+  if (!moonData) return 'N/A';
+  return `${moonData.emoji} ${moonData.name} (${moonData.illumination}% illuminated)`;
+}
+
 /** Return the most frequent value in an array of numbers. */
 function modeValue(arr) {
   const counts = {};
@@ -398,7 +411,7 @@ function displayCurrentWeather(data, displayUnit, options = {}) {
     `Feels Like: ${formatFeelsLike(weather.main.feels_like, displayUnit)}`,
     `Humidity:   ${weather.main.humidity}%`,
     `UV Index:   ${formatUvIndex(weather.uv_index)}`,
-    `Pressure:   ${weather.main.pressure} hPa`,
+    `Pressure:   ${weather.main.pressure} hPa ${formatPressureTrend(weather.pressure_trend?.trend, weather.pressure_trend?.delta)}`,
     `Dew Point:  ${formatDewPoint(weather.dew_point, displayUnit)}`,
     `Cloud Cover: ${weather.cloud_cover ?? 'N/A'}%`,
     `Rain Chance:  ${formatPrecipProbability(weather.precip_probability)}%`
@@ -408,6 +421,7 @@ function displayCurrentWeather(data, displayUnit, options = {}) {
     `Sunrise:     ${formatTime(weather.sys.sunrise)} (${formatRelativeTime(weather.sys.sunrise)})`,
     `Sunset:      ${formatTime(weather.sys.sunset)} (${formatRelativeTime(weather.sys.sunset)})`,
     `Daylight:    ${formatDaylight(weather.sys.sunrise, weather.sys.sunset)}`,
+    `Moon:        ${formatMoonPhase(getMoonPhase())}`,
     aqi ? `Air Quality: ${getAirQualityDescription(aqi)} (AQI: ${aqi})` : '',
     `Min/Max:     ${formatTemp(weather.main.temp_min, displayUnit, { colorCode: true, type: 'min' })} / ${formatTemp(weather.main.temp_max, displayUnit, { colorCode: true, type: 'max' })}`,
     `Wind:        ${wind} (${formatWindDescription(weather.wind.speed, windUnit)})`,
@@ -762,5 +776,7 @@ export {
   formatPrecipProbability,
   formatWindDescription,
   formatDaylight,
+  formatPressureTrend,
+  formatMoonPhase,
   createDataRow
 };
