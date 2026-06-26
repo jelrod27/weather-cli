@@ -149,7 +149,8 @@ describe('normalizeToOwmShape', () => {
       wind_speed_10m: 5,
       wind_direction_10m: 270,
       wind_gusts_10m: 9,
-      cloud_cover: 40
+      cloud_cover: 40,
+      cape: 1500
     },
     hourly: {
       time: [
@@ -184,7 +185,8 @@ describe('normalizeToOwmShape', () => {
       pressure_msl: [
         1010, 1011, 1012, 1013, 1015, 1016, 1014, 1012, 1011, 1010, 1011, 1012, 1013, 1014, 1013,
         1012
-      ]
+      ],
+      shortwave_radiation: [0, 0, 50, 200, 800, 650, 300, 100, 0, 0, 50, 200, 800, 650, 300, 100]
     },
     daily: {
       time: ['2026-04-26', '2026-04-27', '2026-04-28', '2026-04-29', '2026-04-30'],
@@ -591,5 +593,52 @@ describe('normalizeToOwmShape', () => {
       airQuality: { current: null, hourly: {}, daily: {} }
     });
     expect(data.current.pressure_trend).toBeNull();
+  });
+
+  it('maps cape from current weather data', () => {
+    const data = normalizeToOwmShape({
+      place,
+      forecast,
+      airQuality: { current: null, hourly: {}, daily: {} }
+    });
+    expect(data.current.cape).toBe(1500);
+  });
+
+  it('sets cape to null when not present in current weather', () => {
+    const forecastNoCape = {
+      ...forecast,
+      current: { ...forecast.current, cape: undefined }
+    };
+    delete forecastNoCape.current.cape;
+    const data = normalizeToOwmShape({
+      place,
+      forecast: forecastNoCape,
+      airQuality: { current: null, hourly: {}, daily: {} }
+    });
+    expect(data.current.cape).toBeNull();
+  });
+
+  it('maps solar_radiation from hourly data at curIdx', () => {
+    const data = normalizeToOwmShape({
+      place,
+      forecast,
+      airQuality: { current: null, hourly: {}, daily: {} }
+    });
+    // curIdx = 4 (12:00) -> shortwave_radiation[4] = 800
+    expect(data.current.solar_radiation).toBe(800);
+  });
+
+  it('sets solar_radiation to null when not present in hourly data', () => {
+    const forecastNoSolar = {
+      ...forecast,
+      hourly: { ...forecast.hourly }
+    };
+    delete forecastNoSolar.hourly.shortwave_radiation;
+    const data = normalizeToOwmShape({
+      place,
+      forecast: forecastNoSolar,
+      airQuality: { current: null, hourly: {}, daily: {} }
+    });
+    expect(data.current.solar_radiation).toBeNull();
   });
 });

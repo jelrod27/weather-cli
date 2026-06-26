@@ -15,6 +15,8 @@ import {
   formatDaylight,
   formatPressureTrend,
   formatMoonPhase,
+  formatCape,
+  formatSolarRadiation,
   createDataRow,
   displayAlerts,
   displayMinutelyForecast,
@@ -797,5 +799,145 @@ describe('formatMoonPhase', () => {
     const result = formatMoonPhase(moonData);
     expect(result).toContain('Waxing Crescent');
     expect(result).toContain('15%');
+  });
+});
+
+describe('formatCape', () => {
+  it('returns "N/A" for null', () => {
+    expect(formatCape(null)).toBe('N/A');
+  });
+
+  it('returns "N/A" for undefined', () => {
+    expect(formatCape(undefined)).toBe('N/A');
+  });
+
+  it('returns "N/A" for NaN', () => {
+    expect(formatCape(NaN)).toBe('N/A');
+  });
+
+  it('returns none for negative values', () => {
+    expect(formatCape(-100)).toBe('0 J/kg (none)');
+  });
+
+  it('returns low for value 0', () => {
+    expect(formatCape(0)).toContain('0 J/kg (low)');
+  });
+
+  it('returns low for value 500', () => {
+    expect(formatCape(500)).toContain('500 J/kg (low)');
+  });
+
+  it('returns low for value 999', () => {
+    expect(formatCape(999)).toContain('999 J/kg (low)');
+  });
+
+  it('returns moderate for value 1000', () => {
+    expect(formatCape(1000)).toContain('1000 J/kg (moderate)');
+  });
+
+  it('returns moderate for value 1500', () => {
+    expect(formatCape(1500)).toContain('1500 J/kg (moderate)');
+  });
+
+  it('returns moderate for value 2499', () => {
+    expect(formatCape(2499)).toContain('2499 J/kg (moderate)');
+  });
+
+  it('returns high for value 2500', () => {
+    expect(formatCape(2500)).toContain('2500 J/kg (high)');
+  });
+
+  it('returns high for value 3999', () => {
+    expect(formatCape(3999)).toContain('3999 J/kg (high)');
+  });
+
+  it('returns extreme for value 4000', () => {
+    expect(formatCape(4000)).toContain('4000 J/kg (extreme)');
+  });
+
+  it('returns extreme for value 5000', () => {
+    expect(formatCape(5000)).toContain('5000 J/kg (extreme)');
+  });
+
+  it('rounds decimal values', () => {
+    expect(formatCape(1499.6)).toContain('1500 J/kg (moderate)');
+  });
+});
+
+describe('formatSolarRadiation', () => {
+  it('returns "N/A" for null', () => {
+    expect(formatSolarRadiation(null)).toBe('N/A');
+  });
+
+  it('returns "N/A" for undefined', () => {
+    expect(formatSolarRadiation(undefined)).toBe('N/A');
+  });
+
+  it('returns "N/A" for NaN', () => {
+    expect(formatSolarRadiation(NaN)).toBe('N/A');
+  });
+
+  it('returns night for value 0', () => {
+    expect(formatSolarRadiation(0)).toBe('0 W/m2 (night)');
+  });
+
+  it('returns weak for value 1', () => {
+    expect(formatSolarRadiation(1)).toContain('1 W/m2 (weak)');
+  });
+
+  it('returns weak for value 50', () => {
+    expect(formatSolarRadiation(50)).toContain('50 W/m2 (weak)');
+  });
+
+  it('returns weak for value 99', () => {
+    expect(formatSolarRadiation(99)).toContain('99 W/m2 (weak)');
+  });
+
+  it('returns moderate for value 100', () => {
+    expect(formatSolarRadiation(100)).toContain('100 W/m2 (moderate)');
+  });
+
+  it('returns moderate for value 200', () => {
+    expect(formatSolarRadiation(200)).toContain('200 W/m2 (moderate)');
+  });
+
+  it('returns moderate for value 299', () => {
+    expect(formatSolarRadiation(299)).toContain('299 W/m2 (moderate)');
+  });
+
+  it('returns strong for value 300', () => {
+    expect(formatSolarRadiation(300)).toContain('300 W/m2 (strong)');
+  });
+
+  it('returns strong for value 500', () => {
+    expect(formatSolarRadiation(500)).toContain('500 W/m2 (strong)');
+  });
+
+  it('returns strong for value 599', () => {
+    expect(formatSolarRadiation(599)).toContain('599 W/m2 (strong)');
+  });
+
+  it('returns very strong for value 600', () => {
+    expect(formatSolarRadiation(600)).toContain('600 W/m2 (very strong)');
+  });
+
+  it('returns very strong for value 800', () => {
+    expect(formatSolarRadiation(800)).toContain('800 W/m2 (very strong)');
+  });
+
+  it('returns very strong for value 999', () => {
+    expect(formatSolarRadiation(999)).toContain('999 W/m2 (very strong)');
+  });
+
+  it('returns extreme for value 1000', () => {
+    expect(formatSolarRadiation(1000)).toContain('1000 W/m2 (extreme)');
+  });
+
+  it('returns extreme for value 1200', () => {
+    expect(formatSolarRadiation(1200)).toContain('1200 W/m2 (extreme)');
+  });
+
+  it('rounds decimal values', () => {
+    expect(formatSolarRadiation(149.6)).toContain('150 W/m2 (moderate)');
   });
 });
