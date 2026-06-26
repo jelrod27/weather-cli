@@ -124,6 +124,21 @@ function formatDewPoint(value, displayUnit) {
   return `${Math.round(celsius)}°C (${comfort})`;
 }
 
+/**
+ * Format CAPE (convective available potential energy) value with thunderstorm risk label.
+ * @param {number|null|undefined} value - CAPE in J/kg
+ * @returns {string} Formatted string like "1500 J/kg (moderate)" or "N/A"
+ */
+function formatCape(value) {
+  if (value === null || value === undefined || Number.isNaN(value)) return 'N/A';
+  const v = Math.round(value);
+  if (v < 0) return '0 J/kg (none)';
+  if (v < 1000) return chalk.gray(`${v} J/kg (low)`);
+  if (v < 2500) return chalk.yellow(`${v} J/kg (moderate)`);
+  if (v < 4000) return chalk.red(`${v} J/kg (high)`);
+  return chalk.red(`${v} J/kg (extreme)`);
+}
+
 function createDataRow(label, value, options = {}) {
   const { labelWidth = 20, icon = '' } = options;
   const formattedLabel = icon ? `${icon} ${label}` : label;
@@ -414,7 +429,8 @@ function displayCurrentWeather(data, displayUnit, options = {}) {
     `Pressure:   ${weather.main.pressure} hPa ${formatPressureTrend(weather.pressure_trend?.trend, weather.pressure_trend?.delta)}`,
     `Dew Point:  ${formatDewPoint(weather.dew_point, displayUnit)}`,
     `Cloud Cover: ${weather.cloud_cover ?? 'N/A'}%`,
-    `Rain Chance:  ${formatPrecipProbability(weather.precip_probability)}%`
+    `Rain Chance:  ${formatPrecipProbability(weather.precip_probability)}%`,
+    `CAPE:       ${formatCape(weather.cape)}`
   ];
 
   const right = [
@@ -778,5 +794,6 @@ export {
   formatDaylight,
   formatPressureTrend,
   formatMoonPhase,
+  formatCape,
   createDataRow
 };

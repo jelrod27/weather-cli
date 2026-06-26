@@ -149,7 +149,8 @@ describe('normalizeToOwmShape', () => {
       wind_speed_10m: 5,
       wind_direction_10m: 270,
       wind_gusts_10m: 9,
-      cloud_cover: 40
+      cloud_cover: 40,
+      cape: 1500
     },
     hourly: {
       time: [
@@ -591,5 +592,28 @@ describe('normalizeToOwmShape', () => {
       airQuality: { current: null, hourly: {}, daily: {} }
     });
     expect(data.current.pressure_trend).toBeNull();
+  });
+
+  it('maps cape from current weather data', () => {
+    const data = normalizeToOwmShape({
+      place,
+      forecast,
+      airQuality: { current: null, hourly: {}, daily: {} }
+    });
+    expect(data.current.cape).toBe(1500);
+  });
+
+  it('sets cape to null when not present in current weather', () => {
+    const forecastNoCape = {
+      ...forecast,
+      current: { ...forecast.current, cape: undefined }
+    };
+    delete forecastNoCape.current.cape;
+    const data = normalizeToOwmShape({
+      place,
+      forecast: forecastNoCape,
+      airQuality: { current: null, hourly: {}, daily: {} }
+    });
+    expect(data.current.cape).toBeNull();
   });
 });

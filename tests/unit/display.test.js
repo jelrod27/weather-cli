@@ -15,6 +15,7 @@ import {
   formatDaylight,
   formatPressureTrend,
   formatMoonPhase,
+  formatCape,
   createDataRow,
   displayAlerts,
   displayMinutelyForecast,
@@ -797,5 +798,67 @@ describe('formatMoonPhase', () => {
     const result = formatMoonPhase(moonData);
     expect(result).toContain('Waxing Crescent');
     expect(result).toContain('15%');
+  });
+});
+
+describe('formatCape', () => {
+  it('returns "N/A" for null', () => {
+    expect(formatCape(null)).toBe('N/A');
+  });
+
+  it('returns "N/A" for undefined', () => {
+    expect(formatCape(undefined)).toBe('N/A');
+  });
+
+  it('returns "N/A" for NaN', () => {
+    expect(formatCape(NaN)).toBe('N/A');
+  });
+
+  it('returns none for negative values', () => {
+    expect(formatCape(-100)).toBe('0 J/kg (none)');
+  });
+
+  it('returns low for value 0', () => {
+    expect(formatCape(0)).toContain('0 J/kg (low)');
+  });
+
+  it('returns low for value 500', () => {
+    expect(formatCape(500)).toContain('500 J/kg (low)');
+  });
+
+  it('returns low for value 999', () => {
+    expect(formatCape(999)).toContain('999 J/kg (low)');
+  });
+
+  it('returns moderate for value 1000', () => {
+    expect(formatCape(1000)).toContain('1000 J/kg (moderate)');
+  });
+
+  it('returns moderate for value 1500', () => {
+    expect(formatCape(1500)).toContain('1500 J/kg (moderate)');
+  });
+
+  it('returns moderate for value 2499', () => {
+    expect(formatCape(2499)).toContain('2499 J/kg (moderate)');
+  });
+
+  it('returns high for value 2500', () => {
+    expect(formatCape(2500)).toContain('2500 J/kg (high)');
+  });
+
+  it('returns high for value 3999', () => {
+    expect(formatCape(3999)).toContain('3999 J/kg (high)');
+  });
+
+  it('returns extreme for value 4000', () => {
+    expect(formatCape(4000)).toContain('4000 J/kg (extreme)');
+  });
+
+  it('returns extreme for value 5000', () => {
+    expect(formatCape(5000)).toContain('5000 J/kg (extreme)');
+  });
+
+  it('rounds decimal values', () => {
+    expect(formatCape(1499.6)).toContain('1500 J/kg (moderate)');
   });
 });
