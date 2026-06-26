@@ -51,7 +51,10 @@ function withArtOptions(cmd) {
     .option('--art', 'Display ASCII art weather scene')
     .option('--no-art', 'Disable ASCII art')
     .option('--art-only', 'Display only the ASCII art scene')
-    .option('--art-style <style>', 'Art color style: default, retro, dracula, solarized, nord')
+    .option(
+      '--art-style <style>',
+      'Art color style: default, retro, dracula, solarized, nord, catppuccin, gruvbox, tokyo-night, kanagawa, rose-pine, everforest, one-dark, night-owl, cyberpunk, iceberg'
+    )
     .option('--animate', 'Animate the ASCII art scene');
 }
 
