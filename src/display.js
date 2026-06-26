@@ -139,6 +139,22 @@ function formatCape(value) {
   return chalk.red(`${v} J/kg (extreme)`);
 }
 
+/**
+ * Format solar radiation value with intensity label.
+ * @param {number|null|undefined} value - Solar irradiance in W/m2
+ * @returns {string} Formatted string like "500 W/m2 (strong)" or "N/A"
+ */
+function formatSolarRadiation(value) {
+  if (value === null || value === undefined || Number.isNaN(value)) return 'N/A';
+  const v = Math.round(value);
+  if (v === 0) return '0 W/m2 (night)';
+  if (v < 100) return chalk.gray(`${v} W/m2 (weak)`);
+  if (v < 300) return `${v} W/m2 (moderate)`;
+  if (v < 600) return `${v} W/m2 (strong)`;
+  if (v < 1000) return `${v} W/m2 (very strong)`;
+  return chalk.red(`${v} W/m2 (extreme)`);
+}
+
 function createDataRow(label, value, options = {}) {
   const { labelWidth = 20, icon = '' } = options;
   const formattedLabel = icon ? `${icon} ${label}` : label;
@@ -438,6 +454,7 @@ function displayCurrentWeather(data, displayUnit, options = {}) {
     `Sunset:      ${formatTime(weather.sys.sunset)} (${formatRelativeTime(weather.sys.sunset)})`,
     `Daylight:    ${formatDaylight(weather.sys.sunrise, weather.sys.sunset)}`,
     `Moon:        ${formatMoonPhase(getMoonPhase())}`,
+    `Solar:      ${formatSolarRadiation(weather.solar_radiation)}`,
     aqi ? `Air Quality: ${getAirQualityDescription(aqi)} (AQI: ${aqi})` : '',
     `Min/Max:     ${formatTemp(weather.main.temp_min, displayUnit, { colorCode: true, type: 'min' })} / ${formatTemp(weather.main.temp_max, displayUnit, { colorCode: true, type: 'max' })}`,
     `Wind:        ${wind} (${formatWindDescription(weather.wind.speed, windUnit)})`,
@@ -795,5 +812,6 @@ export {
   formatPressureTrend,
   formatMoonPhase,
   formatCape,
+  formatSolarRadiation,
   createDataRow
 };

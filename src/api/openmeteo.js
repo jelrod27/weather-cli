@@ -212,7 +212,8 @@ export async function fetchForecast(lat, lon, { tempUnit, windUnit, includeMinut
       'wind_direction_10m',
       'relative_humidity_2m',
       'pressure_msl',
-      'visibility'
+      'visibility',
+      'shortwave_radiation'
     ].join(','),
     daily: [
       'weather_code',
@@ -444,6 +445,7 @@ export function normalizeToOwmShape({ place, forecast, airQuality, windUnit = 'm
       dew_point: cur.dew_point_2m,
       cloud_cover: cur.cloud_cover,
       cape: cur.cape ?? null,
+      solar_radiation: hourly.shortwave_radiation?.[curIdx] ?? null,
       precip_probability: daily.precipitation_probability?.[0],
       pressure_trend: pressureTrend,
       dt
