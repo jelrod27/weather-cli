@@ -383,7 +383,22 @@ function displayCurrentWeather(data, displayUnit, options = {}) {
     const conditionCode = weather.weather[0].id;
     const isDay = isDaytime(weather);
     const scene = getScene(conditionCode, weather);
-    const namedStyles = ['retro', 'dracula', 'solarized', 'nord'];
+    const namedStyles = [
+      'retro',
+      'dracula',
+      'solarized',
+      'nord',
+      'catppuccin',
+      'gruvbox',
+      'tokyo-night',
+      'kanagawa',
+      'rose-pine',
+      'everforest',
+      'one-dark',
+      'night-owl',
+      'cyberpunk',
+      'iceberg'
+    ];
     const paletteName = namedStyles.includes(options.artStyle)
       ? options.artStyle
       : isDay
