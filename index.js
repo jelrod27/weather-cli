@@ -2,6 +2,7 @@
 
 import { program } from 'commander';
 import chalk from 'chalk';
+import boxen from 'boxen';
 import inquirer from 'inquirer';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
@@ -34,6 +35,9 @@ import {
 import { WeatherError, mapErrorToExitCode } from './src/utils/errors.js';
 import { parseLocation } from './src/utils/locationParser.js';
 import { runStatus } from './src/commands/status.js';
+import { geocode } from './src/api/openmeteo.js';
+import { fetchHistorical, isValidDate } from './src/api/historical.js';
+import { fetchMarine, displayMarine } from './src/api/marine.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const packageJson = JSON.parse(readFileSync(join(__dirname, 'package.json'), 'utf8'));
@@ -43,7 +47,8 @@ function withUnitOptions(cmd) {
   return cmd
     .option('-u, --units <type>', 'Temperature units (metric/imperial/celsius/fahrenheit)', 'auto')
     .option('--celsius', 'Force Celsius temperature display')
-    .option('--fahrenheit', 'Force Fahrenheit temperature display');
+    .option('--fahrenheit', 'Force Fahrenheit temperature display')
+    .option('--json', 'Output raw JSON weather data instead of formatted terminal output');
 }
 
 function withArtOptions(cmd) {
@@ -94,8 +99,12 @@ async function fetchWithCache(location, userUnits, { fetcher = getWeather } = {}
 
 async function showCurrentWeather(location, options, { forecast = false } = {}) {
   const userUnits = processTemperatureOptions(options);
-  const artOpts = await buildArtOptions(options);
   const data = await fetchWithCache(location, userUnits);
+  if (options.json) {
+    console.log(JSON.stringify(data, null, 2));
+    return data;
+  }
+  const artOpts = await buildArtOptions(options);
   displayCurrentWeather(data, data.displayUnit, artOpts);
   if (forecast && !artOpts.artOnly) {
     display24HourForecast(data, data.displayUnit);
@@ -237,8 +246,12 @@ withArtOptions(
 ).action(async (location, options) => {
   const loc = await resolveLocation(location);
   const userUnits = processTemperatureOptions(options);
-  const artOpts = await buildArtOptions(options);
   const data = await fetchWithCache(loc, userUnits);
+  if (options.json) {
+    console.log(JSON.stringify(data, null, 2));
+    return;
+  }
+  const artOpts = await buildArtOptions(options);
   displayCurrentWeather(data, data.displayUnit, artOpts);
   display24HourForecast(data, data.displayUnit);
 });
@@ -250,8 +263,12 @@ withArtOptions(
 ).action(async (location, options) => {
   const loc = await resolveLocation(location);
   const userUnits = processTemperatureOptions(options);
-  const artOpts = await buildArtOptions(options);
   const data = await fetchWithCache(loc, userUnits);
+  if (options.json) {
+    console.log(JSON.stringify(data, null, 2));
+    return;
+  }
+  const artOpts = await buildArtOptions(options);
   displayCurrentWeather(data, data.displayUnit, artOpts);
   display5DayForecast(data, data.displayUnit);
 });
@@ -271,10 +288,14 @@ withArtOptions(
 ).action(async (coordinates, options) => {
   const [lat, lon] = coordinates.split(',').map((c) => c.trim());
   const userUnits = processTemperatureOptions(options);
-  const artOpts = await buildArtOptions(options);
   const data = await fetchWithCache(`${lat},${lon}`, userUnits, {
     fetcher: (_loc, units) => getWeatherByCoords(lat, lon, units)
   });
+  if (options.json) {
+    console.log(JSON.stringify(data, null, 2));
+    return;
+  }
+  const artOpts = await buildArtOptions(options);
   displayCurrentWeather(data, data.displayUnit, artOpts);
 });
 
@@ -371,6 +392,152 @@ withUnitOptions(
 ).action(async (locationWords, options) => {
   await runStatus(locationWords, options, { getDefaultLocation, processTemperatureOptions });
 });
+
+withArtOptions(
+  withUnitOptions(
+    program
+      .command('watch [location]')
+      .description('Watch current weather — auto-refreshes the display on an interval')
+      .option('-i, --interval <minutes>', 'Refresh interval in minutes (1-60)', '5')
+  )
+).action(async (location, options) => {
+  const loc = await resolveLocation(location);
+
+  const intervalRaw = Number.parseInt(options.interval, 10);
+  const intervalMinutes =
+    Number.isInteger(intervalRaw) && intervalRaw >= 1 && intervalRaw <= 60 ? intervalRaw : 5;
+  const intervalMs = intervalMinutes * 60 * 1000;
+
+  // Track the next-refresh time so each render can show a live countdown.
+  let nextRefreshAt = Date.now() + intervalMs;
+
+  async function render() {
+    const userUnits = processTemperatureOptions(options);
+    const artOpts = await buildArtOptions(options);
+    const data = await fetchWithCache(loc, userUnits);
+
+    const remainingMs = Math.max(0, nextRefreshAt - Date.now());
+    const remainingSec = Math.round(remainingMs / 1000);
+    const mm = Math.floor(remainingSec / 60);
+    const ss = String(remainingSec % 60).padStart(2, '0');
+    const countdown = `${mm}:${ss}`;
+
+    console.clear();
+    console.log(
+      chalk.cyan.bold(
+        `🔄 Watching weather for ${loc}  ·  refreshing every ${intervalMinutes}m (next in ${countdown})`
+      )
+    );
+    console.log(chalk.gray('─'.repeat(Math.min(60, process.stdout.columns || 60))));
+    displayCurrentWeather(data, data.displayUnit, artOpts);
+  }
+
+  function resetCountdown() {
+    nextRefreshAt = Date.now() + intervalMs;
+  }
+
+  process.on('SIGINT', () => {
+    console.clear();
+    console.log(chalk.gray('Watch stopped.'));
+    process.exit(0);
+  });
+
+  // First render immediately, then re-fetch on the interval.
+  await render();
+  resetCountdown();
+  setInterval(async () => {
+    try {
+      await render();
+      resetCountdown();
+    } catch (err) {
+      console.error(chalk.red(`❌ Refresh failed: ${err.message}`));
+    }
+  }, intervalMs);
+});
+
+withUnitOptions(
+  program
+    .command('marine [location]')
+    .description(
+      'Show marine/ocean conditions (wave height, direction, period, sea surface temp) for a coastal location'
+    )
+).action(async (location, options) => {
+  const loc = await resolveLocation(location);
+  const place = await geocode(loc);
+  const marine = await fetchMarine(place.lat, place.lon);
+
+  if (!marine) {
+    console.log(chalk.yellow('No marine data available for this location (may be inland).'));
+    return;
+  }
+
+  if (options.json) {
+    console.log(JSON.stringify({ place, marine }, null, 2));
+    return;
+  }
+
+  console.log(displayMarine(marine, place));
+});
+
+program
+  .command('history [location]')
+  .description('Show historical weather for a given date (Open-Meteo Archive API)')
+  .option('-d, --date <YYYY-MM-DD>', 'Date to fetch (required, format YYYY-MM-DD)')
+  .action(async (location, options) => {
+    if (!options.date) {
+      console.error(chalk.red('❌ --date <YYYY-MM-DD> is required for the history command'));
+      console.log(chalk.yellow('Example: weather history --date 2023-07-15 "San Ramon, CA"'));
+      process.exit(6);
+    }
+    if (!isValidDate(options.date)) {
+      console.error(
+        chalk.red(
+          `❌ Invalid date "${options.date}". Expected format: YYYY-MM-DD (e.g. 2023-07-15).`
+        )
+      );
+      console.log(
+        chalk.yellow(
+          'Note: the date must be a real calendar day in the past covered by the archive.'
+        )
+      );
+      process.exit(6);
+    }
+
+    const loc = await resolveLocation(location);
+    const place = await geocode(loc);
+    const data = await fetchHistorical(place.lat, place.lon, options.date);
+
+    const locationLabel = place.admin1
+      ? `${place.name}, ${place.admin1}, ${place.country}`
+      : `${place.name}, ${place.country}`;
+
+    const temp = (v, suffix) =>
+      v === null || v === undefined ? 'N/A' : `${Math.round(v)}${suffix}`;
+    const precip = (v) => (v === null || v === undefined ? 'N/A' : `${v.toFixed(1)} mm`);
+    const wind = (v) => (v === null || v === undefined ? 'N/A' : `${v.toFixed(1)} km/h`);
+
+    const lines = [
+      `${chalk.cyan.bold('Date')}          ${chalk.white(data.date)}`,
+      `${chalk.cyan.bold('Location')}      ${chalk.white(locationLabel)}`,
+      `${chalk.cyan.bold('Temp Max')}      ${chalk.red(temp(data.tempMax, '°C'))}`,
+      `${chalk.cyan.bold('Temp Min')}      ${chalk.blue(temp(data.tempMin, '°C'))}`,
+      `${chalk.cyan.bold('Temp Mean')}     ${chalk.yellow(temp(data.tempMean, '°C'))}`,
+      `${chalk.cyan.bold('Precipitation')} ${chalk.green(precip(data.precipSum))}`,
+      `${chalk.cyan.bold('Max Wind')}      ${chalk.magenta(wind(data.maxWind))}`,
+      `${chalk.cyan.bold('Conditions')}   ${chalk.gray(data.description)}`
+    ];
+
+    console.log(
+      boxen(lines.join('\n'), {
+        padding: { top: 0, bottom: 0, left: 1, right: 1 },
+        margin: 0,
+        borderStyle: 'round',
+        borderColor: 'cyan',
+        title: '🗓️  Historical Weather',
+        titleAlignment: 'left'
+      })
+    );
+  });
 
 program
   .command('interactive')
