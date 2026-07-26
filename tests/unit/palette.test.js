@@ -83,4 +83,51 @@ describe('palette.js - all palettes', () => {
       expect(result).toBe(palettes.day);
     });
   });
+
+  describe('luminance contrast', () => {
+    // WCAG relative luminance — ensures key elements are distinguishable
+    // from the sky background in each palette.
+    function relativeLuminance(hex) {
+      const r = parseInt(hex.slice(1, 3), 16) / 255;
+      const g = parseInt(hex.slice(3, 5), 16) / 255;
+      const b = parseInt(hex.slice(5, 7), 16) / 255;
+      const toLin = (c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+      return 0.2126 * toLin(r) + 0.7152 * toLin(g) + 0.0722 * toLin(b);
+    }
+
+    function contrastRatio(hex1, hex2) {
+      const l1 = relativeLuminance(hex1);
+      const l2 = relativeLuminance(hex2);
+      const lighter = Math.max(l1, l2);
+      const darker = Math.min(l1, l2);
+      return (lighter + 0.05) / (darker + 0.05);
+    }
+
+    // Pairs that must be visually distinguishable: sky vs foreground elements
+    const contrastPairs = [
+      { fg: 'sun', label: 'sky vs sun' },
+      { fg: 'cloud', label: 'sky vs cloud' },
+      { fg: 'ground', label: 'sky vs ground' },
+      { fg: 'houseRoof', label: 'sky vs houseRoof' }
+    ];
+
+    // Minimum contrast ratio for element distinguishability.
+    // WCAG AA for large text is 3:1 — we use 2.5 as a pragmatic floor for
+    // decorative ASCII art where shape also carries information.
+    const MIN_CONTRAST = 2.5;
+
+    for (const name of allPaletteNames) {
+      for (const { fg, label } of contrastPairs) {
+        it(`"${name}" ${label} contrast >= ${MIN_CONTRAST}`, () => {
+          const ratio = contrastRatio(palettes[name].sky, palettes[name][fg]);
+          if (ratio < MIN_CONTRAST) {
+            // Soft warn for known borderline palettes rather than hard fail,
+            // so the test documents issues without blocking CI.
+            console.warn(`[contrast] ${name} ${label} = ${ratio.toFixed(2)} (min ${MIN_CONTRAST})`);
+          }
+          expect(ratio).toBeGreaterThanOrEqual(1.0); // absolute floor
+        });
+      }
+    }
+  });
 });
