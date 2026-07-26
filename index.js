@@ -8,6 +8,9 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
 import { getWeather, getWeatherByCoords } from './src/weather.js';
+import { palettes } from './src/ascii/palette.js';
+import { AsciiRenderer } from './src/ascii/renderer.js';
+import { getScene } from './src/ascii/index.js';
 import {
   getCachedWeather,
   setCachedWeather,
@@ -39,6 +42,40 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const packageJson = JSON.parse(readFileSync(join(__dirname, 'package.json'), 'utf8'));
 const VERSION = packageJson.version;
 
+function listThemes() {
+  const themeNames = Object.keys(palettes).filter((k) => k !== 'day' && k !== 'night');
+  console.log(chalk.cyan.bold('Available art themes:\n'));
+  for (const name of themeNames) {
+    const p = palettes[name];
+    // Show a small swatch: sky, sun, cloud, ground
+    const swatch = ['sky', 'sun', 'cloud', 'ground']
+      .map((k) => chalk.hex(p[k])('\u2588\u2588'))
+      .join('');
+    console.log(`  ${swatch}  ${name}`);
+  }
+  console.log(chalk.gray(`\n${themeNames.length} themes. Use with: weather --art-style <name>`));
+  console.log(chalk.gray(`'default' uses automatic day/night theming.`));
+}
+
+function previewThemes() {
+  const themeNames = Object.keys(palettes).filter((k) => k !== 'day' && k !== 'night');
+  // Use a sunny scene (code 800) for preview — it exercises the most palette keys
+  const scene = getScene(800, {
+    dt: Math.floor(Date.now() / 1000),
+    sys: { sunrise: 0, sunset: Infinity }
+  });
+  const termWidth = process.stdout.columns || 80;
+
+  console.log(chalk.cyan.bold('Theme preview (sunny scene):\n'));
+  for (const name of themeNames) {
+    console.log(chalk.gray(`--- ${name} ---`));
+    const renderer = new AsciiRenderer({ termWidth, paletteName: name });
+    renderer.render(scene, { isDay: true });
+    console.log();
+  }
+  console.log(chalk.gray(`${themeNames.length} themes. Use with: weather --art-style <name>`));
+}
+
 function withUnitOptions(cmd) {
   return cmd
     .option('-u, --units <type>', 'Temperature units (metric/imperial/celsius/fahrenheit)', 'auto')
@@ -53,8 +90,10 @@ function withArtOptions(cmd) {
     .option('--art-only', 'Display only the ASCII art scene')
     .option(
       '--art-style <style>',
-      'Art color style: default, retro, dracula, solarized, nord, catppuccin, gruvbox, tokyo-night, kanagawa, rose-pine, everforest, one-dark, night-owl, cyberpunk, iceberg'
+      'Art color style or "random" (use --list-themes to see all available themes)'
     )
+    .option('--list-themes', 'List all available art themes and exit')
+    .option('--preview-themes', 'Preview every theme with a sample scene and exit')
     .option('--animate', 'Animate the ASCII art scene');
 }
 
@@ -208,6 +247,14 @@ withArtOptions(
       .option('-f, --forecast', 'Include 24-hour forecast')
   )
 ).action(async (locationWords, options) => {
+  if (options.listThemes) {
+    listThemes();
+    return;
+  }
+  if (options.previewThemes) {
+    previewThemes();
+    return;
+  }
   if (!locationWords || locationWords.length === 0) {
     await interactiveMode();
     return;
@@ -226,6 +273,14 @@ withArtOptions(
     program.command('now [location]').description('Get current weather for a location')
   )
 ).action(async (location, options) => {
+  if (options.listThemes) {
+    listThemes();
+    return;
+  }
+  if (options.previewThemes) {
+    previewThemes();
+    return;
+  }
   const loc = await resolveLocation(location);
   await showCurrentWeather(loc, options);
 });
@@ -235,6 +290,14 @@ withArtOptions(
     program.command('forecast [location]').description('Get 24-hour forecast for a location')
   )
 ).action(async (location, options) => {
+  if (options.listThemes) {
+    listThemes();
+    return;
+  }
+  if (options.previewThemes) {
+    previewThemes();
+    return;
+  }
   const loc = await resolveLocation(location);
   const userUnits = processTemperatureOptions(options);
   const artOpts = await buildArtOptions(options);
@@ -248,6 +311,14 @@ withArtOptions(
     program.command('5day [location]').description('Get 5-day forecast for a location')
   )
 ).action(async (location, options) => {
+  if (options.listThemes) {
+    listThemes();
+    return;
+  }
+  if (options.previewThemes) {
+    previewThemes();
+    return;
+  }
   const loc = await resolveLocation(location);
   const userUnits = processTemperatureOptions(options);
   const artOpts = await buildArtOptions(options);

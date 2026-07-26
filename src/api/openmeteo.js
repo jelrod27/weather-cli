@@ -153,7 +153,14 @@ export async function geocode(input) {
     params: { name, count: 10, language: 'en', format: 'json' }
   });
 
-  const results = res.data?.results || [];
+  const results = res.data?.results;
+  if (!Array.isArray(results)) {
+    throw new WeatherError(
+      `Location service returned unexpected data for "${sanitizeForDisplay(input)}". Please try again.`,
+      ERROR_CODES.UPSTREAM_DATA_ERROR,
+      502
+    );
+  }
   if (results.length === 0) {
     throw new WeatherError(
       `Location "${sanitizeForDisplay(input)}" not found. Please check the spelling or try: "City, Country Code" (e.g., "San Ramon, US")`,
@@ -165,7 +172,15 @@ export async function geocode(input) {
   let filtered = results;
   if (country) {
     const byCountry = results.filter((r) => r.country_code === country);
-    if (byCountry.length > 0) filtered = byCountry;
+    if (byCountry.length > 0) {
+      filtered = byCountry;
+    } else {
+      throw new WeatherError(
+        `Location "${sanitizeForDisplay(input)}" not found in country "${country}". Please check the spelling or try: "City, Country Code" (e.g., "San Ramon, US")`,
+        ERROR_CODES.LOCATION_NOT_FOUND,
+        404
+      );
+    }
   }
   if (admin1) {
     const byAdmin = filtered.filter((r) => {
@@ -224,6 +239,7 @@ export async function fetchForecast(lat, lon, { tempUnit, windUnit, includeMinut
       'precipitation_probability'
     ].join(','),
     timezone: 'auto',
+    timeformat: 'unixtime',
     forecast_days: 6,
     temperature_unit: tempUnit,
     wind_speed_unit: windUnit
@@ -281,6 +297,8 @@ export async function fetchAirQuality(lat, lon) {
 
 function isoToUnix(iso) {
   if (!iso) return null;
+  // If already a Unix timestamp (number in seconds), pass through
+  if (typeof iso === 'number') return iso;
   const ms = new Date(iso).getTime();
   return Number.isFinite(ms) ? Math.floor(ms / 1000) : null;
 }
@@ -315,9 +333,19 @@ export async function getAlerts(lat, lon, countryCode) {
 // Build OWM-shaped object from Open-Meteo responses + geocoding result.
 // Display layer reads this shape unchanged.
 export function normalizeToOwmShape({ place, forecast, airQuality, windUnit = 'ms', alerts = [] }) {
+  if (!forecast || typeof forecast !== 'object') {
+    throw new WeatherError(
+      'Forecast data is missing or malformed from the weather provider.',
+      ERROR_CODES.UPSTREAM_DATA_ERROR,
+      502
+    );
+  }
+
   const cur = forecast.current || {};
   const hourly = forecast.hourly || {};
   const daily = forecast.daily || {};
+
+  const timezone = forecast.timezone || null;
 
   const curWmo = wmoToOwm(cur.weather_code);
   const curIdx = nearestHourlyIndex(hourly.time || [], cur.time);
@@ -455,6 +483,7 @@ export function normalizeToOwmShape({ place, forecast, airQuality, windUnit = 'm
     dailyAqi: dailyAqiMap,
     windUnit,
     alerts,
-    minutely
+    minutely,
+    timezone
   };
 }
