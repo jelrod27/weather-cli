@@ -11,6 +11,13 @@ import { palettes } from './ascii/palette.js';
 // 'day' and 'night' are automatic fallbacks, not user-selectable themes.
 const NAMED_STYLES = Object.keys(palettes).filter((k) => k !== 'day' && k !== 'night');
 
+function resolveArtStyle(artStyle, isDay) {
+  if (artStyle === 'random') {
+    return NAMED_STYLES[Math.floor(Math.random() * NAMED_STYLES.length)];
+  }
+  return NAMED_STYLES.includes(artStyle) ? artStyle : isDay ? 'day' : 'night';
+}
+
 function formatTemp(temp, displayUnit, options = {}) {
   if (temp === null || temp === undefined || Number.isNaN(temp)) return 'N/A';
   const unit = displayUnit === 'fahrenheit' ? '°F' : '°C';
@@ -388,11 +395,7 @@ function displayCurrentWeather(data, displayUnit, options = {}) {
     const conditionCode = weather.weather[0].id;
     const isDay = isDaytime(weather);
     const scene = getScene(conditionCode, weather);
-    const paletteName = NAMED_STYLES.includes(options.artStyle)
-      ? options.artStyle
-      : isDay
-        ? 'day'
-        : 'night';
+    const paletteName = resolveArtStyle(options.artStyle, isDay);
     const renderer = new AsciiRenderer({
       termWidth: getTerminalWidth(),
       paletteName
