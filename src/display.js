@@ -5,6 +5,11 @@ import { AsciiRenderer } from './ascii/renderer.js';
 import { renderBrailleLineChart, dataPointColumns, buildLabelRow } from './ascii/sparkline.js';
 import { getMoonPhase } from './utils/moon.js';
 import { weatherEmojis } from './utils/icons.js';
+import { palettes } from './ascii/palette.js';
+
+// Derive named themes from the palettes object so they never drift.
+// 'day' and 'night' are automatic fallbacks, not user-selectable themes.
+const NAMED_STYLES = Object.keys(palettes).filter((k) => k !== 'day' && k !== 'night');
 
 function formatTemp(temp, displayUnit, options = {}) {
   if (temp === null || temp === undefined || Number.isNaN(temp)) return 'N/A';
@@ -383,23 +388,7 @@ function displayCurrentWeather(data, displayUnit, options = {}) {
     const conditionCode = weather.weather[0].id;
     const isDay = isDaytime(weather);
     const scene = getScene(conditionCode, weather);
-    const namedStyles = [
-      'retro',
-      'dracula',
-      'solarized',
-      'nord',
-      'catppuccin',
-      'gruvbox',
-      'tokyo-night',
-      'kanagawa',
-      'rose-pine',
-      'everforest',
-      'one-dark',
-      'night-owl',
-      'cyberpunk',
-      'iceberg'
-    ];
-    const paletteName = namedStyles.includes(options.artStyle)
+    const paletteName = NAMED_STYLES.includes(options.artStyle)
       ? options.artStyle
       : isDay
         ? 'day'
