@@ -8,49 +8,15 @@ import {
   normalizeToOwmShape,
   getAlerts
 } from './api/openmeteo.js';
+import { determineDisplayUnits, unitsForOpenMeteo } from './units.js';
 
-// Regional temperature units mapping (US + a handful of US-aligned territories)
-const FAHRENHEIT_COUNTRIES = new Set(['US', 'USA', 'BS', 'BZ', 'KY', 'PW']);
-
-// Temperature conversion utilities
-function celsiusToFahrenheit(celsius) {
-  return (celsius * 9) / 5 + 32;
-}
-
-function fahrenheitToCelsius(fahrenheit) {
-  return ((fahrenheit - 32) * 5) / 9;
-}
-
-function getRegionalTempUnit(countryCode) {
-  return FAHRENHEIT_COUNTRIES.has(countryCode?.toUpperCase()) ? 'fahrenheit' : 'celsius';
-}
-
-function convertTemperature(temp, fromUnit, toUnit) {
-  if (fromUnit === toUnit) return temp;
-  if (fromUnit === 'celsius' && toUnit === 'fahrenheit') return celsiusToFahrenheit(temp);
-  if (fromUnit === 'fahrenheit' && toUnit === 'celsius') return fahrenheitToCelsius(temp);
-  return temp;
-}
-
-function determineDisplayUnits(countryCode, userPreference = null) {
-  if (userPreference === 'fahrenheit' || userPreference === 'imperial') {
-    return { api: 'imperial', display: 'fahrenheit' };
-  }
-  if (userPreference === 'celsius' || userPreference === 'metric') {
-    return { api: 'metric', display: 'celsius' };
-  }
-  const regionalUnit = getRegionalTempUnit(countryCode);
-  return {
-    api: regionalUnit === 'fahrenheit' ? 'imperial' : 'metric',
-    display: regionalUnit
-  };
-}
-
-function unitsForOpenMeteo(unitSystem) {
-  return unitSystem.api === 'imperial'
-    ? { tempUnit: 'fahrenheit', windUnit: 'mph' }
-    : { tempUnit: 'celsius', windUnit: 'ms' };
-}
+// Re-export unit functions for backward compatibility (tests import these)
+export {
+  celsiusToFahrenheit,
+  fahrenheitToCelsius,
+  convertTemperature,
+  determineDisplayUnits
+} from './units.js';
 
 function rethrow(error, locationLabel) {
   const safeLabel = sanitizeForDisplay(locationLabel);
@@ -154,11 +120,4 @@ async function getWeatherByCoords(lat, lon, userUnits = null, options = {}) {
   }
 }
 
-export {
-  getWeather,
-  getWeatherByCoords,
-  determineDisplayUnits,
-  convertTemperature,
-  celsiusToFahrenheit,
-  fahrenheitToCelsius
-};
+export { getWeather, getWeatherByCoords };
