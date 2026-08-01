@@ -12,7 +12,7 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const source = readFileSync(join(__dirname, '..', '..', 'index.js'), 'utf8');
+const source = readFileSync(join(__dirname, '..', '..', 'src', 'commands', 'index.js'), 'utf8');
 
 // Re-implement the parsing logic mirroring the watch action so we can test it
 // without spinning up an interval that would hang the test process.
