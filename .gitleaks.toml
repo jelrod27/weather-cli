@@ -1,0 +1,67 @@
+# Gitleaks configuration for weather-cli-16bit
+# https://github.com/gitleaks/gitleaks
+
+title = "weather-cli-16bit secret scanning rules"
+
+[extend]
+# Use the default gitleaks rules as a base
+useDefault = true
+
+# Custom rules for project-specific secrets
+[[rules]]
+id = "sentry-auth-token"
+description = "Sentry Authentication Token"
+regex = '''sntryu_[a-zA-Z0-9]{64}'''
+keywords = ["sntryu_"]
+
+[[rules]]
+id = "sentry-system-token"
+description = "Sentry System Token"
+regex = '''sntrys_[a-zA-Z0-9]{64}'''
+keywords = ["sntrys_"]
+
+[[rules]]
+id = "openweather-api-key"
+description = "OpenWeatherMap API Key"
+regex = '''[a-f0-9]{32}'''
+keywords = ["openweather", "appid"]
+entropy = 3.5
+
+[[rules]]
+id = "open-meteo-api-key"
+description = "Open-Meteo API Key"
+regex = '''[a-f0-9]{32}'''
+keywords = ["openmeteo", "open-meteo"]
+entropy = 3.5
+
+# Allowlist - paths and patterns to ignore
+[allowlist]
+description = "Global allowlist — example files, dependencies, and generated artifacts"
+paths = [
+    '''\.env\.example$''',
+    '''\.env\.local\.example$''',
+    '''package-lock\.json$''',
+    '''node_modules/''',
+    '''\.next/''',
+    '''test-results/''',
+    '''playwright-report/''',
+]
+
+# Specific strings to ignore (placeholder values, not real secrets)
+regexes = [
+    '''your_[a-z_]+_here''',
+    '''placeholder''',
+    '''test-api-key''',
+    '''DEMO_KEY''',
+    '''YOUR_GITHUB_TOKEN''',
+]
+
+# Pre-existing commits with known secrets (cleaned from current tree but in history)
+commits = [
+    "6e32af7c8e4c7b5bf6d29abcc312294d579fda12",
+    "50265b4966638024418e512bdaa7181870021dc2",
+    "c9d4382ee5751b9923fe4efc43aad1feffb4eeab",
+    "304594e",
+    "4d045f2",
+    "16680d1",
+]
