@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-08-01
+
+### 🏗️ Architecture (deep-module refactor)
+
+- **Extracted `src/formatters.js`** — pure formatting functions (temperature, wind, UV, dew point, CAPE, solar radiation, alerts) moved out of `display.js`, which dropped from 824 lines / 22 exports to a deep rendering module with 5 public entry points.
+- **Extracted `src/weatherReport.js`** — `normalizeToOwmShape` now lives in a module that owns the canonical `WeatherReport` shape flowing from API to display, so the OWM-compat shape is an internal adapter detail instead of a contract every caller memorizes.
+- **Extracted `src/commands/index.js`** — command registration moved out of `index.js` (548 → 15 lines) into a single `registerAll(program)` seam, with a shared `runCurrentCommand` helper eliminating 8× duplicated fetch-display-cache wiring.
+- **Extracted `src/units.js`** — temperature conversion/resolution logic was scattered across `weather.js`, `display.js`, and `config.js`; now consolidated in one module.
+- **Extracted `src/api/geocode.js`** — location parsing and geocoding result selection merged into one module (previously split across `locationParser.js` and `openmeteo.js`).
+
+### ✨ Added
+
+- **New commands** (from the `feat/four-new-commands` branch): `watch` (auto-refresh loop with countdown), `history` (Open-Meteo Archive API), `marine` (wave height/direction/period/sea surface temp), and consistent `--json` raw output across commands.
+- **`CONTEXT.md`** domain glossary (Location, WeatherReport, Forecast, Current, Alert, Scene, Palette, Formatter, Render entry point, Unit system, Display unit, Cache, Config, HTTP client).
+- **`docs/adr/0001-deepen-modules.md`** — architecture decision record for the deep-module refactor.
+- **`docs/agents/`** — skill-suite scaffold (issue tracker, triage labels, domain docs) wiring up the engineering skills.
+- **`.gitleaks.toml`** — project-specific secret-scanning rules plus a historical-commit allowlist.
+
+### 🔧 Improved
+
+- Hardened `geocode` — non-array results now throw `UPSTREAM_DATA_ERROR` (502); an explicit-but-unmatched country constraint throws `LOCATION_NOT_FOUND` instead of silently falling back.
+- Removed 3 dead exports (`DEFAULT_FRAME_DELAY`, `FAHRENHEIT_COUNTRIES`, `getRegionalTempUnit`) and an unused `chalk` import in `marine.js`.
+- Synced `AGENTS.md` with the `## Agent skills` block from `CLAUDE.md`.
+
 ## [0.4.0] - 2026-04-26
 
 ### 💥 Breaking
