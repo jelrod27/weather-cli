@@ -111,4 +111,4 @@ class AsciiRenderer {
   }
 }
 
-export { AsciiRenderer, MIN_TERM_WIDTH, DEFAULT_FRAME_DELAY };
+export { AsciiRenderer, MIN_TERM_WIDTH };

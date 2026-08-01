@@ -1,5 +1,4 @@
 import httpClient from './http.js';
-import chalk from 'chalk';
 import boxen from 'boxen';
 
 const MARINE_URL = 'https://marine-api.open-meteo.com/v1/marine';

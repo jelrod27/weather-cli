@@ -66,10 +66,8 @@ function processTemperatureOptions(options) {
 }
 
 export {
-  FAHRENHEIT_COUNTRIES,
   celsiusToFahrenheit,
   fahrenheitToCelsius,
-  getRegionalTempUnit,
   convertTemperature,
   determineDisplayUnits,
   unitsForOpenMeteo,

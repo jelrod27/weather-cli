@@ -4,6 +4,20 @@
 
 weather-cli is a Node.js command-line weather client powered by the Open-Meteo API (no API key required). It is the primary repo serviced by the Spectra AI engineer profile.
 
+## Agent skills
+
+### Issue tracker
+
+Issues live as GitHub issues in `jelrod27/weather-cli` (uses `gh` CLI). See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Five canonical labels: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+
 ## Tech Stack
 
 - Node.js >= 20 (ESM only)
