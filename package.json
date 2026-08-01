@@ -1,6 +1,6 @@
 {
   "name": "weather-cli-16bit",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "A simple, intelligent weather CLI powered by Open-Meteo — no API key required",
   "main": "index.js",
   "type": "module",
@@ -78,6 +78,7 @@
     "ora": "^9.3.0"
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "^4.1.10",
     "eslint": "^10.2.1",
     "eslint-config-prettier": "^10.1.8",
     "husky": "^9.1.7",

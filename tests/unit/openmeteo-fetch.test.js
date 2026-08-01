@@ -6,7 +6,8 @@ vi.mock('../../src/api/http.js', () => ({
   default: { get }
 }));
 
-const { fetchForecast, geocode, normalizeToOwmShape } = await import('../../src/api/openmeteo.js');
+const { fetchForecast, fetchAirQuality, geocode, normalizeToOwmShape } =
+  await import('../../src/api/openmeteo.js');
 
 describe('fetchForecast timestamp contract', () => {
   beforeEach(() => {
@@ -47,6 +48,36 @@ describe('geocode response contract', () => {
   it('rejects a non-array results payload as upstream data corruption', async () => {
     get.mockResolvedValue({ data: { results: {} } });
     await expect(geocode('London')).rejects.toMatchObject({ code: 'UPSTREAM_DATA_ERROR' });
+  });
+});
+
+describe('fetchAirQuality', () => {
+  beforeEach(() => get.mockReset());
+
+  it('derives daily AQI from hourly averages', async () => {
+    get.mockResolvedValue({
+      data: {
+        current: { us_aqi: 60 },
+        hourly: {
+          time: ['2026-08-01T00:00', '2026-08-01T01:00', '2026-08-01T02:00'],
+          us_aqi: [50, 60, 70]
+        }
+      }
+    });
+    const result = await fetchAirQuality(51.5, -0.12);
+    expect(result.current).toBe(60);
+    expect(result.daily.time).toHaveLength(1);
+    expect(result.daily.us_aqi[0]).toBe(60); // avg of 50,60,70
+    expect(get).toHaveBeenCalledWith(
+      'https://air-quality-api.open-meteo.com/v1/air-quality',
+      expect.anything()
+    );
+  });
+
+  it('returns empty data when the API call fails (AQ is non-essential)', async () => {
+    get.mockRejectedValueOnce(new Error('network down'));
+    const result = await fetchAirQuality(51.5, -0.12);
+    expect(result).toEqual({ current: null, hourly: {}, daily: {} });
   });
 });
 
