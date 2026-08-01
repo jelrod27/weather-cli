@@ -2,6 +2,7 @@ import fs from 'fs/promises';
 import { randomUUID } from 'crypto';
 import { join } from 'path';
 import { homedir } from 'os';
+import { processTemperatureOptions } from './units.js';
 
 const XDG_CONFIG_HOME = process.env.XDG_CONFIG_HOME || join(homedir(), '.config');
 const CONFIG_DIR = join(XDG_CONFIG_HOME, 'weather-cli');
@@ -90,16 +91,6 @@ async function setCacheTtl(minutes) {
     config.cacheTtl = minutes;
   }
   await saveConfig(config);
-}
-
-// Process temperature options from command line
-function processTemperatureOptions(options) {
-  if (options.celsius) return 'celsius';
-  if (options.fahrenheit) return 'fahrenheit';
-  if (options.units && options.units !== 'auto') {
-    return options.units === 'metric' ? 'celsius' : 'fahrenheit';
-  }
-  return null; // Use auto-detection
 }
 
 async function getAsciiConfig() {
