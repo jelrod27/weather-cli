@@ -1,5 +1,6 @@
 import axios from 'axios';
 import axiosRetry from 'axios-retry';
+import { randomUUID } from 'crypto';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -20,7 +21,7 @@ const httpClient = axios.create({
 
 // Add request interceptor to set unique request ID per request
 httpClient.interceptors.request.use((config) => {
-  config.headers['X-Request-ID'] = `req_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+  config.headers['X-Request-ID'] = `req_${randomUUID()}`;
   return config;
 });
 
