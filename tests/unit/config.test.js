@@ -82,12 +82,25 @@ describe('saveConfig (atomic write)', () => {
     // Should write to a temp file first
     expect(fs.writeFile).toHaveBeenCalledWith(
       expect.stringContaining('.tmp'),
-      JSON.stringify({ defaultLocation: 'Paris' }, null, 2)
+      JSON.stringify({ defaultLocation: 'Paris' }, null, 2),
+      { mode: 0o600 }
     );
     // Then atomically rename to the real config file
     expect(fs.rename).toHaveBeenCalledWith(
       expect.stringContaining('.tmp'),
       expect.stringContaining('config.json')
+    );
+  });
+
+  it('creates the config directory owner-only', async () => {
+    fs.writeFile.mockResolvedValue();
+    fs.rename.mockResolvedValue();
+
+    await saveConfig({ defaultLocation: 'Paris' });
+
+    expect(fs.mkdir).toHaveBeenCalledWith(
+      expect.stringContaining('weather-cli'),
+      expect.objectContaining({ mode: 0o700 })
     );
   });
 

@@ -1,9 +1,44 @@
 import { describe, it, expect } from 'vitest';
 import {
   sanitizeLocation,
+  stripControlChars,
   validateLocation,
   validateCoordinates
 } from '../../src/utils/validators.js';
+
+describe('stripControlChars', () => {
+  it('removes CSI colour and cursor sequences', () => {
+    expect(stripControlChars('\x1b[31mLondon\x1b[0m')).toBe('London');
+    expect(stripControlChars('London\x1b[2J\x1b[H')).toBe('London');
+  });
+
+  it('removes OSC sequences including their payload', () => {
+    expect(stripControlChars('\x1b]0;pwned\x07London')).toBe('London');
+    expect(stripControlChars('\x1b]8;;https://evil.example\x1b\\London')).toBe('London');
+  });
+
+  it('removes C0 and C1 control characters', () => {
+    expect(stripControlChars('Lon\x00d\x07on\r\n')).toBe('London');
+    expect(stripControlChars('Lon\x9bdon')).toBe('London');
+  });
+
+  it('keeps ordinary unicode place names intact', () => {
+    expect(stripControlChars('São Paulo')).toBe('São Paulo');
+    expect(stripControlChars('東京')).toBe('東京');
+  });
+
+  it('does not truncate unless a maxLength is given', () => {
+    const long = 'a'.repeat(500);
+    expect(stripControlChars(long)).toHaveLength(500);
+    expect(stripControlChars(long, { maxLength: 100 })).toHaveLength(100);
+  });
+
+  it('coerces non-strings without throwing', () => {
+    expect(stripControlChars(null)).toBe('');
+    expect(stripControlChars(undefined)).toBe('');
+    expect(stripControlChars(42)).toBe('42');
+  });
+});
 
 describe('sanitizeLocation', () => {
   it('removes unsafe characters', () => {

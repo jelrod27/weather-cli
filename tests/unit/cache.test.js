@@ -90,12 +90,25 @@ describe('saveCache (atomic write)', () => {
     // Should write to a temp file first
     expect(fs.writeFile).toHaveBeenCalledWith(
       expect.stringContaining('.tmp'),
-      JSON.stringify(cache, null, 2)
+      JSON.stringify(cache, null, 2),
+      { mode: 0o600 }
     );
     // Then atomically rename to the real cache file
     expect(fs.rename).toHaveBeenCalledWith(
       expect.stringContaining('.tmp'),
       expect.stringContaining('cache.json')
+    );
+  });
+
+  it('creates the cache directory owner-only', async () => {
+    fs.writeFile.mockResolvedValue();
+    fs.rename.mockResolvedValue();
+
+    await saveCache({});
+
+    expect(fs.mkdir).toHaveBeenCalledWith(
+      expect.stringContaining('weather-cli'),
+      expect.objectContaining({ mode: 0o700 })
     );
   });
 
@@ -331,7 +344,9 @@ describe('clearCache', () => {
     await clearCache();
 
     // Should write '{}' to a temp file, then rename
-    expect(fs.writeFile).toHaveBeenCalledWith(expect.stringContaining('.tmp'), '{}');
+    expect(fs.writeFile).toHaveBeenCalledWith(expect.stringContaining('.tmp'), '{}', {
+      mode: 0o600
+    });
     expect(fs.rename).toHaveBeenCalled();
   });
 });
