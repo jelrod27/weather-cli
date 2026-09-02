@@ -63,3 +63,18 @@ export function validateCoordinates(lat, lon) {
 
   return { latitude, longitude };
 }
+
+const WATCH_INTERVAL_MIN = 1;
+const WATCH_INTERVAL_MAX = 60;
+const WATCH_INTERVAL_DEFAULT = 5;
+
+/**
+ * Parse the `watch --interval <minutes>` value. Accepts whole minutes from
+ * 1 to 60; anything else (non-numeric or out of range) falls back to 5.
+ */
+export function parseWatchInterval(value) {
+  const minutes = Number.parseInt(value, 10);
+  return Number.isInteger(minutes) && minutes >= WATCH_INTERVAL_MIN && minutes <= WATCH_INTERVAL_MAX
+    ? minutes
+    : WATCH_INTERVAL_DEFAULT;
+}

@@ -1,77 +1,199 @@
-import { describe, it, expect } from 'vitest';
-import { program } from 'commander';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { Command } from 'commander';
 
-// We re-import index.js in a way that lets us inspect the registered commands.
-// Because index.js calls program.parseAsync() at the end, importing it directly
-// would parse process.argv. To avoid side effects, we read the source and check
-// the command registration structurally, and we unit-test the interval parsing
-// logic in isolation.
+// Stub the I/O edges so the real watch handler can run in-process:
+// no network, no cache file, no config file, no terminal output.
+vi.mock('../../src/weather.js', async (importOriginal) => ({
+  ...(await importOriginal()),
+  getWeather: vi.fn()
+}));
+vi.mock('../../src/cache.js', async (importOriginal) => ({
+  ...(await importOriginal()),
+  getCachedWeather: vi.fn(),
+  setCachedWeather: vi.fn()
+}));
+vi.mock('../../src/display.js', async (importOriginal) => ({
+  ...(await importOriginal()),
+  displayCurrentWeather: vi.fn()
+}));
+vi.mock('../../src/config.js', async (importOriginal) => ({
+  ...(await importOriginal()),
+  getDefaultLocation: vi.fn(),
+  getAsciiConfig: vi.fn()
+}));
 
-import { readFileSync } from 'fs';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
+import { registerAll } from '../../src/commands/index.js';
+import { parseWatchInterval } from '../../src/utils/validators.js';
+import { getWeather } from '../../src/weather.js';
+import { getCachedWeather, setCachedWeather } from '../../src/cache.js';
+import { displayCurrentWeather } from '../../src/display.js';
+import { getAsciiConfig } from '../../src/config.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const source = readFileSync(join(__dirname, '..', '..', 'src', 'commands', 'index.js'), 'utf8');
+const MINUTE = 60 * 1000;
 
-// Re-implement the parsing logic mirroring the watch action so we can test it
-// without spinning up an interval that would hang the test process.
-function parseInterval(value) {
-  const intervalRaw = Number.parseInt(value, 10);
-  return Number.isInteger(intervalRaw) && intervalRaw >= 1 && intervalRaw <= 60 ? intervalRaw : 5;
+const sampleData = {
+  current: { name: 'London', weather: [{ id: 800, main: 'Clear' }], main: { temp: 18 } },
+  displayUnit: 'celsius'
+};
+
+function buildProgram() {
+  const program = new Command();
+  // Throw on commander errors instead of exiting the test runner.
+  program.exitOverride();
+  registerAll(program);
+  return program;
+}
+
+function findWatch(program) {
+  return program.commands.find((cmd) => cmd.name() === 'watch');
+}
+
+async function runWatch(...args) {
+  await buildProgram().parseAsync(['watch', ...args], { from: 'user' });
 }
 
 describe('watch command', () => {
-  it('is registered in index.js', () => {
-    expect(source).toMatch(/\.command\(['"]watch \[location\]['"]\)/);
+  describe('registration', () => {
+    it('registers "watch [location]" with the shared unit and art options', () => {
+      const watch = findWatch(buildProgram());
+      expect(watch).toBeDefined();
+
+      const [location] = watch.registeredArguments;
+      expect(location.name()).toBe('location');
+      expect(location.required).toBe(false);
+
+      const longFlags = watch.options.map((opt) => opt.long);
+      expect(longFlags).toEqual(
+        expect.arrayContaining([
+          '--interval',
+          '--units',
+          '--celsius',
+          '--fahrenheit',
+          '--json',
+          '--art',
+          '--art-style'
+        ])
+      );
+    });
+
+    it('exposes -i, --interval <minutes> defaulting to 5', () => {
+      const interval = findWatch(buildProgram()).options.find((opt) => opt.long === '--interval');
+      expect(interval.short).toBe('-i');
+      expect(interval.required).toBe(true); // <minutes> takes a value
+      expect(interval.defaultValue).toBe('5');
+    });
   });
 
-  it('has a --interval option', () => {
-    expect(source).toMatch(/--interval <minutes>/);
+  describe('parseWatchInterval', () => {
+    it('accepts whole minutes from 1 to 60', () => {
+      expect(parseWatchInterval('1')).toBe(1);
+      expect(parseWatchInterval('5')).toBe(5);
+      expect(parseWatchInterval('30')).toBe(30);
+      expect(parseWatchInterval('60')).toBe(60);
+    });
+
+    it('falls back to 5 for out-of-range values', () => {
+      expect(parseWatchInterval('0')).toBe(5);
+      expect(parseWatchInterval('61')).toBe(5);
+      expect(parseWatchInterval('-3')).toBe(5);
+      expect(parseWatchInterval('100')).toBe(5);
+    });
+
+    it('falls back to 5 for non-numeric input', () => {
+      expect(parseWatchInterval('abc')).toBe(5);
+      expect(parseWatchInterval('')).toBe(5);
+      expect(parseWatchInterval(undefined)).toBe(5);
+      expect(parseWatchInterval(NaN)).toBe(5);
+    });
   });
 
-  it('registers a SIGINT handler that exits 0', () => {
-    expect(source).toMatch(/process\.on\(['"]SIGINT['"]/);
-    expect(source).toMatch(/process\.exit\(0\)/);
-  });
+  describe('action', () => {
+    let sigintBefore;
 
-  it('uses console.clear before each render', () => {
-    expect(source).toMatch(/console\.clear\(\)/);
-  });
+    beforeEach(() => {
+      vi.useFakeTimers();
+      sigintBefore = new Set(process.listeners('SIGINT'));
+      getCachedWeather.mockResolvedValue(null);
+      setCachedWeather.mockResolvedValue(undefined);
+      getWeather.mockResolvedValue(sampleData);
+      getAsciiConfig.mockResolvedValue({ enabled: false, style: 'default' });
+      vi.spyOn(console, 'log').mockImplementation(() => {});
+      vi.spyOn(console, 'clear').mockImplementation(() => {});
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+    });
 
-  it('uses setInterval for the refresh loop', () => {
-    expect(source).toMatch(/setInterval\(/);
-  });
+    afterEach(() => {
+      // Remove only the SIGINT listeners this test added; vitest has its own.
+      for (const listener of process.listeners('SIGINT')) {
+        if (!sigintBefore.has(listener)) process.off('SIGINT', listener);
+      }
+      vi.restoreAllMocks();
+      vi.clearAllTimers();
+      vi.useRealTimers();
+      vi.clearAllMocks();
+    });
 
-  it('parses valid interval values within 1-60', () => {
-    expect(parseInterval('5')).toBe(5);
-    expect(parseInterval('1')).toBe(1);
-    expect(parseInterval('60')).toBe(60);
-    expect(parseInterval('30')).toBe(30);
-  });
+    it('clears the screen and renders immediately, then refreshes on the parsed interval', async () => {
+      await runWatch('London', '--interval', '2');
 
-  it('clamps out-of-range values to the default of 5', () => {
-    expect(parseInterval('0')).toBe(5);
-    expect(parseInterval('61')).toBe(5);
-    expect(parseInterval('-3')).toBe(5);
-    expect(parseInterval('100')).toBe(5);
-  });
+      expect(getWeather).toHaveBeenCalledTimes(1);
+      expect(getWeather.mock.calls[0][0]).toBe('London');
+      expect(console.clear).toHaveBeenCalledTimes(1);
+      expect(displayCurrentWeather).toHaveBeenCalledTimes(1);
+      expect(displayCurrentWeather).toHaveBeenCalledWith(sampleData, 'celsius', expect.any(Object));
 
-  it('falls back to default for non-numeric input', () => {
-    expect(parseInterval('abc')).toBe(5);
-    expect(parseInterval('')).toBe(5);
-    expect(parseInterval(NaN)).toBe(5);
-  });
+      await vi.advanceTimersByTimeAsync(MINUTE);
+      expect(displayCurrentWeather).toHaveBeenCalledTimes(1); // 1 of 2 minutes elapsed
 
-  it('the registered watch command can be found on a fresh commander program', () => {
-    // Verify commander accepts the same option signature we use.
-    const cmd = program
-      .command('watch [location]')
-      .option('-i, --interval <minutes>', 'Refresh interval in minutes (1-60)', '5');
-    const opts = cmd.options;
-    expect(opts.some((o) => o.long === '--interval')).toBe(true);
-    // Default should be '5'
-    const intervalOpt = opts.find((o) => o.long === '--interval');
-    expect(intervalOpt.defaultValue).toBe('5');
+      await vi.advanceTimersByTimeAsync(MINUTE);
+      expect(console.clear).toHaveBeenCalledTimes(2);
+      expect(displayCurrentWeather).toHaveBeenCalledTimes(2);
+
+      await vi.advanceTimersByTimeAsync(2 * MINUTE);
+      expect(displayCurrentWeather).toHaveBeenCalledTimes(3);
+    });
+
+    it('falls back to a 5 minute refresh for an out-of-range --interval', async () => {
+      await runWatch('London', '--interval', '99');
+
+      await vi.advanceTimersByTimeAsync(4 * MINUTE);
+      expect(displayCurrentWeather).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(MINUTE);
+      expect(displayCurrentWeather).toHaveBeenCalledTimes(2);
+    });
+
+    it('serves cached data without fetching', async () => {
+      getCachedWeather.mockResolvedValue(sampleData);
+      await runWatch('London');
+
+      expect(getWeather).not.toHaveBeenCalled();
+      expect(displayCurrentWeather).toHaveBeenCalledWith(sampleData, 'celsius', expect.any(Object));
+    });
+
+    it('installs a SIGINT handler that clears the screen and exits 0', async () => {
+      const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {});
+      await runWatch('London');
+
+      const added = process.listeners('SIGINT').filter((l) => !sigintBefore.has(l));
+      expect(added).toHaveLength(1);
+
+      console.clear.mockClear();
+      added[0]();
+      expect(console.clear).toHaveBeenCalledTimes(1);
+      expect(exitSpy).toHaveBeenCalledWith(0);
+    });
+
+    it('reports a failed refresh and keeps the loop alive', async () => {
+      await runWatch('London', '--interval', '1');
+      getWeather.mockRejectedValueOnce(new Error('boom'));
+
+      await vi.advanceTimersByTimeAsync(MINUTE);
+      expect(console.error).toHaveBeenCalledWith(expect.stringContaining('Refresh failed: boom'));
+      expect(displayCurrentWeather).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(MINUTE);
+      expect(displayCurrentWeather).toHaveBeenCalledTimes(2);
+    });
   });
 });

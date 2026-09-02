@@ -96,9 +96,11 @@ describe('AsciiRenderer', () => {
       const result = renderer.renderToString(mockScene);
       const lines = result.split('\n');
       const expectedPad = Math.floor((80 - mockScene.width) / 2);
-      for (const line of lines) {
-        expect(line.startsWith(' '.repeat(expectedPad))).toBe(true);
-      }
+      const art = mockScene.getArt();
+      // Exact match: catches over-padding as well as under-padding.
+      lines.forEach((line, i) => {
+        expect(line).toBe(' '.repeat(expectedPad) + art[i]);
+      });
     });
 
     it('does not add negative padding for wide art', () => {
