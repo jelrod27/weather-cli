@@ -243,6 +243,8 @@ async function interactiveMode() {
 // ─── Register all commands ───────────────────────────────────────
 
 function registerAll(program) {
+  program.enablePositionalOptions();
+
   // Default command (no subcommand)
   withArtOptions(
     withUnitOptions(
