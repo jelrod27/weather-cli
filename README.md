@@ -25,6 +25,7 @@ weather San Ramon CA            # current weather
 weather London                  # international
 weather 94583                   # US ZIP
 weather forecast Tokyo          # 24-hour forecast
+weather now London --fahrenheit --json
 weather 5day Paris              # 5-day forecast
 weather compare "New York" London
 weather coords 37.7749,-122.4194
@@ -32,6 +33,8 @@ weather --art --animate         # ASCII art scene
 ```
 
 Units default to the region (°F in the US, °C elsewhere). Override with `--celsius`, `--fahrenheit`, or `-u metric|imperial`. Every call prefetches current + 24h + 5day + air-quality in one round-trip; subsequent commands for the same location in the next 30 min hit the local cache and return instantly.
+
+Put options after a subcommand, as in `weather now London --fahrenheit --json`. Options before a subcommand, such as `weather --json now London`, belong to the root command and are not forwarded to the subcommand.
 
 ## Output
 

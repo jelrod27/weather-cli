@@ -1,6 +1,6 @@
 import httpClient from './http.js';
 import { WeatherError, ERROR_CODES } from '../utils/errors.js';
-import { sanitizeForDisplay } from '../utils/validators.js';
+import { sanitizeForDisplay, stripControlChars } from '../utils/validators.js';
 
 /**
  * Geocode module — owns location parsing and result selection.
@@ -198,12 +198,15 @@ export async function geocode(input) {
     if (byAdmin.length > 0) filtered = byAdmin;
   }
 
+  // Provider-supplied names are printed to the terminal and, via
+  // `weather status`, into shell prompts. Strip terminal control sequences
+  // here so every consumer gets display-safe strings.
   const top = filtered[0];
   return {
-    name: top.name,
+    name: stripControlChars(top.name, { maxLength: 100 }),
     lat: top.latitude,
     lon: top.longitude,
-    country: top.country_code || '',
-    admin1: top.admin1 || ''
+    country: stripControlChars(top.country_code || '', { maxLength: 8 }),
+    admin1: stripControlChars(top.admin1 || '', { maxLength: 100 })
   };
 }

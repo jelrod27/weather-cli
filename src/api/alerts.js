@@ -1,4 +1,5 @@
 import httpClient from './http.js';
+import { stripControlChars } from '../utils/validators.js';
 
 const NWS_ALERTS_URL = 'https://api.weather.gov/alerts/active';
 
@@ -62,22 +63,24 @@ export async function fetchAlerts(lat, lon, countryCode) {
 function normalizeNwsAlert(props) {
   if (!props || !props.event) return null;
 
-  const severity = props.severity || 'Unknown';
-  const urgency = props.urgency || 'Expected';
+  const severity = stripControlChars(props.severity || 'Unknown', { maxLength: 32 });
+  const urgency = stripControlChars(props.urgency || 'Expected', { maxLength: 32 });
 
   // Snippet: first 200 chars of description, stripped of newlines
-  const rawDesc = (props.description || '').replace(/\r?\n/g, ' ').trim();
+  const rawDesc = stripControlChars((props.description || '').replace(/\r?\n/g, ' '));
   const description = rawDesc.length > 200 ? rawDesc.slice(0, 197) + '...' : rawDesc;
 
+  const event = stripControlChars(props.event, { maxLength: 200 });
+
   return {
-    event: props.event,
-    headline: props.headline || props.event,
+    event,
+    headline: stripControlChars(props.headline || event, { maxLength: 200 }),
     severity,
     urgency,
     description,
     effective: props.effective || null,
     expires: props.expires || null,
-    areaDesc: props.areaDesc || ''
+    areaDesc: stripControlChars(props.areaDesc || '', { maxLength: 500 })
   };
 }
 

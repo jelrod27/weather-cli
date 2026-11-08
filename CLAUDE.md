@@ -79,7 +79,7 @@ Single shared `axios` instance with 5 s timeout, `User-Agent: weather-cli/<versi
 
 JSON file in the XDG cache directory: `~/.cache/weather-cli/cache.json` (or `$XDG_CACHE_HOME/weather-cli/cache.json`). Entry expiry defaults to 30 min (configurable via `cacheTtl` in config), 100-entry cap, 7-day hard max age, and persisted `lastAccessed` timestamps to support LRU-style eviction across CLI invocations.
 
-Each cache entry carries a `schemaVersion` field. Bump `CACHE_SCHEMA_VERSION` in `src/cache.js` whenever the cached `data` shape changes — older entries are silently skipped on read. Current value: `3`.
+Each cache entry carries a `schemaVersion` field. Bump `CACHE_SCHEMA_VERSION` in `src/cache.js` whenever the cached `data` shape changes — older entries are silently skipped on read. Current value: `4` (invalidates entries created before provider text sanitization).
 
 ### ASCII art subsystem (src/ascii/)
 

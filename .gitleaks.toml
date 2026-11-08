@@ -35,12 +35,11 @@ keywords = ["openmeteo", "open-meteo"]
 entropy = 3.5
 
 # Allowlist - paths and patterns to ignore
-[allowlist]
+[[allowlists]]
 description = "Global allowlist — example files, dependencies, and generated artifacts"
 paths = [
     '''\.env\.example$''',
     '''\.env\.local\.example$''',
-    '''package-lock\.json$''',
     '''node_modules/''',
     '''\.next/''',
     '''test-results/''',
@@ -48,15 +47,25 @@ paths = [
 ]
 
 # Specific strings to ignore (placeholder values, not real secrets)
+[[allowlists]]
+description = "Documented placeholder values"
 regexes = [
     '''your_[a-z_]+_here''',
-    '''placeholder''',
     '''test-api-key''',
     '''DEMO_KEY''',
     '''YOUR_GITHUB_TOKEN''',
 ]
 
-# Pre-existing commits with known secrets (cleaned from current tree but in history)
+# Historical findings, reviewed 2026-08-26. All three are placeholders or a
+# credential that no longer authenticates:
+#   6e32af7 .env WEATHER_API_KEY   - OpenWeatherMap key, verified dead (HTTP 401);
+#                                    the project moved to Open-Meteo, which needs no key
+#   50265b4 GITHUB_REPO_UPDATE.md  - literal "YOUR_GITHUB_TOKEN" placeholder in a curl example
+#   c9d4382 test/weather-api.test.js - literal "test-api-key" fixture
+# Kept allowlisted so CI stays green on history; do not add entries here without
+# recording what was found and how it was resolved.
+[[allowlists]]
+description = "Reviewed historical commits"
 commits = [
     "6e32af7c8e4c7b5bf6d29abcc312294d579fda12",
     "50265b4966638024418e512bdaa7181870021dc2",
@@ -65,3 +74,8 @@ commits = [
     "4d045f2",
     "16680d1",
 ]
+
+# Note: package-lock.json is deliberately not allowlisted here. The upstream
+# default config already skips lock files for entropy noise, and a local
+# allowlist would additionally hide registry credentials (_auth, _authToken)
+# committed into it.
