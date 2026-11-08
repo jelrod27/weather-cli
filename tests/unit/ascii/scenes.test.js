@@ -78,7 +78,8 @@ for (const { module: scene, label } of scenes) {
 
     it('matches snapshot', () => {
       const art = scene.getArt({ isDay: true });
-      expect(art.join('\n')).toMatchSnapshot();
+      // Snapshot each line so padding stays inside quotes rather than at EOL.
+      expect(art).toMatchSnapshot();
     });
   });
 }
