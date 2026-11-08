@@ -5,6 +5,7 @@ import fs from 'fs/promises';
 vi.mock('fs/promises', () => ({
   default: {
     mkdir: vi.fn().mockResolvedValue(undefined),
+    chmod: vi.fn().mockResolvedValue(undefined),
     readFile: vi.fn(),
     writeFile: vi.fn(),
     rename: vi.fn(),
@@ -37,11 +38,57 @@ const {
 // ensureConfigDir re-runs and fs.mkdir gets called again.
 afterEach(() => {
   __resetForTesting();
+  vi.unstubAllGlobals();
 });
 
 describe('loadConfig', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    fs.chmod.mockResolvedValue(undefined);
+  });
+
+  it.skipIf(process.platform === 'win32')(
+    'does not read after a missing file cannot be secured',
+    async () => {
+      fs.chmod.mockImplementation(async (path) => {
+        if (path.endsWith('config.json'))
+          throw Object.assign(new Error('missing'), { code: 'ENOENT' });
+      });
+      fs.readFile.mockResolvedValue('{"unexpected":"replacement"}');
+
+      expect(await loadConfig()).toEqual({});
+      expect(fs.readFile).not.toHaveBeenCalled();
+    }
+  );
+
+  it.skipIf(process.platform === 'win32')(
+    'reports directory permission failures without reading the config',
+    async () => {
+      fs.chmod.mockRejectedValueOnce(Object.assign(new Error('chmod denied'), { code: 'EPERM' }));
+
+      await expect(loadConfig()).rejects.toThrow('chmod denied');
+      expect(fs.readFile).not.toHaveBeenCalled();
+    }
+  );
+
+  it.skipIf(process.platform === 'win32')(
+    'reports file permission failures without reading the config',
+    async () => {
+      fs.chmod.mockResolvedValueOnce(undefined);
+      fs.chmod.mockRejectedValueOnce(Object.assign(new Error('chmod denied'), { code: 'EACCES' }));
+
+      await expect(loadConfig()).rejects.toThrow('chmod denied');
+      expect(fs.readFile).not.toHaveBeenCalled();
+    }
+  );
+
+  it('loads on Windows without relying on POSIX chmod', async () => {
+    vi.stubGlobal('process', { ...process, platform: 'win32' });
+    fs.chmod.mockRejectedValue(new Error('unsupported'));
+    fs.readFile.mockResolvedValue('{"defaultLocation":"London"}');
+
+    expect(await loadConfig()).toEqual({ defaultLocation: 'London' });
+    expect(fs.chmod).not.toHaveBeenCalled();
   });
 
   it('returns parsed config when file exists', async () => {
@@ -82,12 +129,25 @@ describe('saveConfig (atomic write)', () => {
     // Should write to a temp file first
     expect(fs.writeFile).toHaveBeenCalledWith(
       expect.stringContaining('.tmp'),
-      JSON.stringify({ defaultLocation: 'Paris' }, null, 2)
+      JSON.stringify({ defaultLocation: 'Paris' }, null, 2),
+      { mode: 0o600 }
     );
     // Then atomically rename to the real config file
     expect(fs.rename).toHaveBeenCalledWith(
       expect.stringContaining('.tmp'),
       expect.stringContaining('config.json')
+    );
+  });
+
+  it('creates the config directory owner-only', async () => {
+    fs.writeFile.mockResolvedValue();
+    fs.rename.mockResolvedValue();
+
+    await saveConfig({ defaultLocation: 'Paris' });
+
+    expect(fs.mkdir).toHaveBeenCalledWith(
+      expect.stringContaining('weather-cli'),
+      expect.objectContaining({ mode: 0o700 })
     );
   });
 

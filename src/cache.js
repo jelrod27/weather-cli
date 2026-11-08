@@ -8,11 +8,16 @@ import { loadConfig } from './config.js';
 const XDG_CACHE_HOME = process.env.XDG_CACHE_HOME || join(homedir(), '.cache');
 const CACHE_DIR = join(XDG_CACHE_HOME, 'weather-cli');
 const CACHE_FILE = join(CACHE_DIR, 'cache.json');
+// Cached entries are a history of the user's locations and coordinates,
+// so keep them owner-only.
+const DIR_MODE = 0o700;
+const FILE_MODE = 0o600;
 const DEFAULT_CACHE_EXPIRY = 30 * 60 * 1000; // 30 minutes
 const MAX_CACHE_SIZE = 100; // Maximum number of entries
 const MAX_CACHE_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days
+// Version 4 invalidates entries created before provider text sanitization.
 // Bump when the cached `data` shape changes. Old entries are discarded on read.
-const CACHE_SCHEMA_VERSION = 3;
+const CACHE_SCHEMA_VERSION = 4;
 
 // Resolve the effective cache TTL from config, falling back to the default.
 // Config value `cacheTtl` is in minutes. Clamped to [1, 1440] (1 min to 24h).
@@ -39,15 +44,26 @@ async function getCacheExpiry() {
 let _cacheDirEnsured = false;
 async function ensureCacheDir() {
   if (!_cacheDirEnsured) {
-    await fs.mkdir(CACHE_DIR, { recursive: true });
+    await fs.mkdir(CACHE_DIR, { recursive: true, mode: DIR_MODE });
+    // mkdir's mode does not tighten directories created by older versions.
+    if (process.platform !== 'win32') await fs.chmod(CACHE_DIR, DIR_MODE);
     _cacheDirEnsured = true;
   }
 }
 
 // Load cache from file
 async function loadCache() {
+  await ensureCacheDir();
+  if (process.platform !== 'win32') {
+    try {
+      await fs.chmod(CACHE_FILE, FILE_MODE);
+    } catch (err) {
+      // Do not read a replacement file after a failed permission check.
+      if (err.code === 'ENOENT') return {};
+      throw err;
+    }
+  }
   try {
-    await ensureCacheDir();
     const data = await fs.readFile(CACHE_FILE, 'utf8');
     return JSON.parse(data);
   } catch {
@@ -63,7 +79,7 @@ async function saveCache(cache) {
   await ensureCacheDir();
   const tmpFile = `${CACHE_FILE}.${randomUUID()}.tmp`;
   try {
-    await fs.writeFile(tmpFile, JSON.stringify(cache, null, 2));
+    await fs.writeFile(tmpFile, JSON.stringify(cache, null, 2), { mode: FILE_MODE });
     await fs.rename(tmpFile, CACHE_FILE);
   } catch {
     // Clean up the temp file if rename fails

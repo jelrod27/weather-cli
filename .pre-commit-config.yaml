@@ -4,6 +4,12 @@ repos:
     hooks:
       - id: gitleaks
         name: gitleaks (secret scan)
+      - id: gitleaks
+        alias: gitleaks-lockfiles
+        name: gitleaks (lockfile credentials)
+        entry: gitleaks git --pre-commit --staged --config .gitleaks-lockfiles.toml --redact --no-banner
+        files: ^package-lock\.json$
+        pass_filenames: false
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0

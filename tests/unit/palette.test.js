@@ -52,21 +52,11 @@ describe('palette.js - all palettes', () => {
   });
 
   describe('getPalette function', () => {
-    it('should return the catppuccin palette for "catppuccin"', () => {
-      const result = getPalette('catppuccin');
-      expect(result).toBe(palettes.catppuccin);
-      expect(result).not.toBe(palettes.day);
-    });
-
-    it('should return the day palette for "day"', () => {
-      const result = getPalette('day');
-      expect(result).toBe(palettes.day);
-    });
-
-    it('should return the night palette for "night"', () => {
-      const result = getPalette('night');
-      expect(result).toBe(palettes.night);
-    });
+    for (const name of allPaletteNames) {
+      it(`should return the "${name}" palette by name`, () => {
+        expect(getPalette(name)).toBe(palettes[name]);
+      });
+    }
 
     it('should fall back to day palette for unknown name', () => {
       const result = getPalette('unknown');
@@ -116,17 +106,45 @@ describe('palette.js - all palettes', () => {
     // decorative ASCII art where shape also carries information.
     const MIN_CONTRAST = 2.5;
 
+    // Pairs that currently fall below MIN_CONTRAST, listed as "palette:element".
+    // Every pair not listed here is held to the hard floor. If one of these
+    // palettes is improved, its test fails until the entry is removed, so the
+    // list can only shrink.
+    const KNOWN_LOW_CONTRAST = new Set([
+      'day:sun',
+      'day:cloud',
+      'night:cloud',
+      'night:ground',
+      'night:houseRoof',
+      'retro:cloud',
+      'retro:ground',
+      'retro:houseRoof',
+      'solarized:sun',
+      'solarized:cloud',
+      'solarized:ground',
+      'solarized:houseRoof',
+      'nord:cloud',
+      'nord:houseRoof',
+      'one-dark:cloud',
+      'cyberpunk:cloud'
+    ]);
+
     for (const name of allPaletteNames) {
       for (const { fg, label } of contrastPairs) {
-        it(`"${name}" ${label} contrast >= ${MIN_CONTRAST}`, () => {
-          const ratio = contrastRatio(palettes[name].sky, palettes[name][fg]);
-          if (ratio < MIN_CONTRAST) {
-            // Soft warn for known borderline palettes rather than hard fail,
-            // so the test documents issues without blocking CI.
-            console.warn(`[contrast] ${name} ${label} = ${ratio.toFixed(2)} (min ${MIN_CONTRAST})`);
-          }
-          expect(ratio).toBeGreaterThanOrEqual(1.0); // absolute floor
-        });
+        const ratio = () => contrastRatio(palettes[name].sky, palettes[name][fg]);
+
+        if (KNOWN_LOW_CONTRAST.has(`${name}:${fg}`)) {
+          it(`"${name}" ${label} is a known low-contrast pair (< ${MIN_CONTRAST})`, () => {
+            expect(
+              ratio(),
+              `${name} ${label} now meets ${MIN_CONTRAST}; remove "${name}:${fg}" from KNOWN_LOW_CONTRAST`
+            ).toBeLessThan(MIN_CONTRAST);
+          });
+        } else {
+          it(`"${name}" ${label} contrast >= ${MIN_CONTRAST}`, () => {
+            expect(ratio()).toBeGreaterThanOrEqual(MIN_CONTRAST);
+          });
+        }
       }
     }
   });

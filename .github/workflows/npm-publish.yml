@@ -8,20 +8,21 @@ permissions:
   contents: read
 
 jobs:
-  publish:
+  validate:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
+    outputs:
+      should_publish: ${{ steps.version_check.outputs.should_publish }}
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ github.sha }}
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '20'
-          registry-url: 'https://registry.npmjs.org'
 
       - name: Install dependencies
         run: npm ci
@@ -29,14 +30,21 @@ jobs:
           CI: true
 
       - name: Run tests
-        run: npm run test:ci
+        run: npm run lint && npm run test:ci
         env:
           CI: true
+
+      # Packing may execute prepare even with npm 10's --ignore-scripts flag.
+      # Keep every dependency/lifecycle execution in this unprivileged job.
+      - name: Pack validated package
+        run: |
+          mkdir -p "$RUNNER_TEMP/weather-package"
+          npm pack --pack-destination "$RUNNER_TEMP/weather-package"
 
       - name: Check if version matches release tag
         id: version_check
         run: |
-          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+          PACKAGE_VERSION=$(tar -xOf "$RUNNER_TEMP/weather-package/"*.tgz package/package.json | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).version")
           RELEASE_TAG="${GITHUB_REF#refs/tags/}"
           echo "package_version=$PACKAGE_VERSION" >> $GITHUB_OUTPUT
           echo "release_tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
@@ -46,9 +54,38 @@ jobs:
             echo "should_publish=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Publish to NPM
+      - name: Save validated package
         if: steps.version_check.outputs.should_publish == 'true'
-        run: npm publish
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: weather-package
+          path: ${{ runner.temp }}/weather-package/*.tgz
+          if-no-files-found: error
+
+  publish:
+    needs: validate
+    if: needs.validate.outputs.should_publish == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Download validated package
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: weather-package
+          path: ${{ runner.temp }}/weather-package
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      # Publishing a tarball avoids directory packing and prepare entirely.
+      # Do not install dependencies or run lifecycle scripts with OIDC.
+      - name: Publish to NPM
+        run: npm publish "$RUNNER_TEMP/weather-package/"*.tgz --ignore-scripts --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           CI: true

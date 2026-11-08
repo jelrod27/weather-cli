@@ -1,9 +1,89 @@
 import { describe, it, expect } from 'vitest';
 import {
   sanitizeLocation,
+  sanitizeForDisplay,
+  stripControlChars,
   validateLocation,
   validateCoordinates
 } from '../../src/utils/validators.js';
+
+describe('stripControlChars', () => {
+  it('removes CSI colour and cursor sequences', () => {
+    expect(stripControlChars('\x1b[31mLondon\x1b[0m')).toBe('London');
+    expect(stripControlChars('London\x1b[2J\x1b[H')).toBe('London');
+  });
+
+  it('removes OSC sequences including their payload', () => {
+    expect(stripControlChars('\x1b]0;pwned\x07London')).toBe('London');
+    expect(stripControlChars('\x1b]8;;https://evil.example\x1b\\London')).toBe('London');
+  });
+
+  it.each(['P', 'X', '^', '_'])('removes the payload of an ESC %s control string', (type) => {
+    expect(stripControlChars(`\x1b${type}hidden payload\x1b\\London`)).toBe('London');
+    expect(stripControlChars(`London\x1b${type}unterminated payload`)).toBe('London');
+  });
+
+  it.each(['\x90', '\x98', '\x9e', '\x9f'])(
+    'removes the payload of a C1 %j control string',
+    (start) => {
+      expect(stripControlChars(`${start}hidden payload\x9cLondon`)).toBe('London');
+      expect(stripControlChars(`${start}hidden payload\x1b\\London`)).toBe('London');
+    }
+  );
+
+  it('removes C1 OSC payloads terminated by BEL or ST', () => {
+    expect(stripControlChars('\x9d0;hidden title\x07London')).toBe('London');
+    expect(stripControlChars('\x9d0;hidden title\x9cLondon')).toBe('London');
+    expect(stripControlChars('\x1b]0;hidden title\x9cLondon')).toBe('London');
+  });
+
+  it('treats control-string introducers inside a payload as payload text', () => {
+    expect(stripControlChars('\x1b]0;title\x1b_hidden\x07London')).toBe('London');
+    expect(stripControlChars('\x1bPdata\x1b]hidden\x1b\\London')).toBe('London');
+  });
+
+  it('removes C0 and C1 control characters', () => {
+    expect(stripControlChars('Lon\x00d\x07on\r\n')).toBe('London');
+    expect(stripControlChars('Lon\x9bdon')).toBe('London');
+  });
+
+  it('keeps ordinary unicode place names intact', () => {
+    expect(stripControlChars('São Paulo')).toBe('São Paulo');
+    expect(stripControlChars('東京')).toBe('東京');
+  });
+
+  it('does not truncate unless a maxLength is given', () => {
+    const long = 'a'.repeat(500);
+    expect(stripControlChars(long)).toHaveLength(500);
+    expect(stripControlChars(long, { maxLength: 100 })).toHaveLength(100);
+  });
+
+  it('clamps by Unicode code points without splitting astral characters', () => {
+    expect(stripControlChars('𠮷野家', { maxLength: 2 })).toBe('𠮷野');
+    expect(stripControlChars('a𠮷b', { maxLength: 2 })).toBe('a𠮷');
+  });
+
+  it('coerces non-strings without throwing', () => {
+    expect(stripControlChars(null)).toBe('');
+    expect(stripControlChars(undefined)).toBe('');
+    expect(stripControlChars(42)).toBe('42');
+  });
+
+  it('sanitizes and clamps values after coercing malformed provider fields', () => {
+    expect(stripControlChars(['\x1b]0;pwned\x07London'])).toBe('London');
+    expect(stripControlChars(['London'], { maxLength: 3 })).toBe('Lon');
+  });
+});
+
+describe('sanitizeForDisplay', () => {
+  it('preserves visible text after an OSC string terminator', () => {
+    expect(sanitizeForDisplay('\x1b]8;;https://evil.example\x1b\\London')).toBe('London');
+  });
+
+  it('preserves complete astral characters at the length limit', () => {
+    expect(sanitizeForDisplay('𠮷'.repeat(101))).toBe('𠮷'.repeat(100));
+  });
+});
 
 describe('sanitizeLocation', () => {
   it('removes unsafe characters', () => {

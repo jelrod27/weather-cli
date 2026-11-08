@@ -27,6 +27,7 @@ import {
 } from '../config.js';
 import { WeatherError, mapErrorToExitCode } from '../utils/errors.js';
 import { parseLocation } from '../utils/locationParser.js';
+import { parseWatchInterval } from '../utils/validators.js';
 import { runStatus } from './status.js';
 import { geocode } from '../api/openmeteo.js';
 import { fetchHistorical, isValidDate } from '../api/historical.js';
@@ -243,6 +244,8 @@ async function interactiveMode() {
 // ─── Register all commands ───────────────────────────────────────
 
 function registerAll(program) {
+  program.enablePositionalOptions();
+
   // Default command (no subcommand)
   withArtOptions(
     withUnitOptions(
@@ -485,9 +488,7 @@ function registerAll(program) {
   ).action(async (location, options) => {
     const loc = await resolveLocation(location);
 
-    const intervalRaw = Number.parseInt(options.interval, 10);
-    const intervalMinutes =
-      Number.isInteger(intervalRaw) && intervalRaw >= 1 && intervalRaw <= 60 ? intervalRaw : 5;
+    const intervalMinutes = parseWatchInterval(options.interval);
     const intervalMs = intervalMinutes * 60 * 1000;
 
     let nextRefreshAt = Date.now() + intervalMs;

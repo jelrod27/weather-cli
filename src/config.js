@@ -7,21 +7,35 @@ import { processTemperatureOptions } from './units.js';
 const XDG_CONFIG_HOME = process.env.XDG_CONFIG_HOME || join(homedir(), '.config');
 const CONFIG_DIR = join(XDG_CONFIG_HOME, 'weather-cli');
 const CONFIG_FILE = join(CONFIG_DIR, 'config.json');
+// The config records the user's default location, so keep it owner-only.
+const DIR_MODE = 0o700;
+const FILE_MODE = 0o600;
 
 // Ensure the config directory exists before any file I/O.
 // Called lazily on first read/write so we don't create dirs for mere imports.
 let _configDirEnsured = false;
 async function ensureConfigDir() {
   if (!_configDirEnsured) {
-    await fs.mkdir(CONFIG_DIR, { recursive: true });
+    await fs.mkdir(CONFIG_DIR, { recursive: true, mode: DIR_MODE });
+    // mkdir's mode does not tighten directories created by older versions.
+    if (process.platform !== 'win32') await fs.chmod(CONFIG_DIR, DIR_MODE);
     _configDirEnsured = true;
   }
 }
 
 // Load saved configuration
 async function loadConfig() {
+  await ensureConfigDir();
+  if (process.platform !== 'win32') {
+    try {
+      await fs.chmod(CONFIG_FILE, FILE_MODE);
+    } catch (err) {
+      // Do not read a replacement file after a failed permission check.
+      if (err.code === 'ENOENT') return {};
+      throw err;
+    }
+  }
   try {
-    await ensureConfigDir();
     const data = await fs.readFile(CONFIG_FILE, 'utf8');
     return JSON.parse(data);
   } catch {
@@ -37,7 +51,7 @@ async function saveConfig(config) {
   await ensureConfigDir();
   const tmpFile = `${CONFIG_FILE}.${randomUUID()}.tmp`;
   try {
-    await fs.writeFile(tmpFile, JSON.stringify(config, null, 2));
+    await fs.writeFile(tmpFile, JSON.stringify(config, null, 2), { mode: FILE_MODE });
     await fs.rename(tmpFile, CONFIG_FILE);
   } catch (err) {
     // Clean up the temp file if rename fails
