@@ -36,6 +36,17 @@ jobs:
       - run: npm ci
       - run: npm test
 
+  test-summary:
+    name: test
+    needs: test
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require all Node.js test jobs to pass
+        env:
+          TEST_RESULT: ${{ needs.test.result }}
+        run: test "$TEST_RESULT" = success
+
   coverage:
     runs-on: ubuntu-latest
     steps:
