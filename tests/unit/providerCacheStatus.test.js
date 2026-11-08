@@ -26,7 +26,8 @@ describe('provider text through the persistent status cache', () => {
 
   it('persists sanitized provider text and renders a safe status after a fresh cache read', async () => {
     get.mockImplementation(async (url) => {
-      if (url.includes('geocoding-api')) {
+      const { hostname, pathname } = new URL(url);
+      if (hostname === 'geocoding-api.open-meteo.com') {
         return {
           data: {
             results: [
@@ -41,7 +42,7 @@ describe('provider text through the persistent status cache', () => {
           }
         };
       }
-      if (url.includes('api.open-meteo.com/v1/forecast')) {
+      if (hostname === 'api.open-meteo.com' && pathname === '/v1/forecast') {
         return {
           data: {
             timezone: 'Europe/London',
@@ -51,10 +52,10 @@ describe('provider text through the persistent status cache', () => {
           }
         };
       }
-      if (url.includes('air-quality-api')) {
+      if (hostname === 'air-quality-api.open-meteo.com') {
         return { data: { current: { us_aqi: 20 }, hourly: { time: [], us_aqi: [] } } };
       }
-      if (url.includes('api.weather.gov')) {
+      if (hostname === 'api.weather.gov') {
         return {
           data: {
             features: [
