@@ -67,8 +67,9 @@ function normalizeNwsAlert(props) {
   const urgency = stripControlChars(props.urgency || 'Expected', { maxLength: 32 });
 
   // Snippet: first 200 chars of description, stripped of newlines
-  const rawDesc = stripControlChars((props.description || '').replace(/\r?\n/g, ' '));
-  const description = rawDesc.length > 200 ? rawDesc.slice(0, 197) + '...' : rawDesc;
+  const rawDesc = Array.from(stripControlChars((props.description || '').replace(/\r?\n/g, ' ')));
+  const description =
+    rawDesc.length > 200 ? rawDesc.slice(0, 197).join('') + '...' : rawDesc.join('');
 
   const event = stripControlChars(props.event, { maxLength: 200 });
 

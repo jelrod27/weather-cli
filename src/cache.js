@@ -45,14 +45,25 @@ let _cacheDirEnsured = false;
 async function ensureCacheDir() {
   if (!_cacheDirEnsured) {
     await fs.mkdir(CACHE_DIR, { recursive: true, mode: DIR_MODE });
+    // mkdir's mode does not tighten directories created by older versions.
+    if (process.platform !== 'win32') await fs.chmod(CACHE_DIR, DIR_MODE);
     _cacheDirEnsured = true;
   }
 }
 
 // Load cache from file
 async function loadCache() {
+  await ensureCacheDir();
+  if (process.platform !== 'win32') {
+    try {
+      await fs.chmod(CACHE_FILE, FILE_MODE);
+    } catch (err) {
+      // Do not read a replacement file after a failed permission check.
+      if (err.code === 'ENOENT') return {};
+      throw err;
+    }
+  }
   try {
-    await ensureCacheDir();
     const data = await fs.readFile(CACHE_FILE, 'utf8');
     return JSON.parse(data);
   } catch {

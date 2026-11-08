@@ -17,14 +17,25 @@ let _configDirEnsured = false;
 async function ensureConfigDir() {
   if (!_configDirEnsured) {
     await fs.mkdir(CONFIG_DIR, { recursive: true, mode: DIR_MODE });
+    // mkdir's mode does not tighten directories created by older versions.
+    if (process.platform !== 'win32') await fs.chmod(CONFIG_DIR, DIR_MODE);
     _configDirEnsured = true;
   }
 }
 
 // Load saved configuration
 async function loadConfig() {
+  await ensureConfigDir();
+  if (process.platform !== 'win32') {
+    try {
+      await fs.chmod(CONFIG_FILE, FILE_MODE);
+    } catch (err) {
+      // Do not read a replacement file after a failed permission check.
+      if (err.code === 'ENOENT') return {};
+      throw err;
+    }
+  }
   try {
-    await ensureConfigDir();
     const data = await fs.readFile(CONFIG_FILE, 'utf8');
     return JSON.parse(data);
   } catch {

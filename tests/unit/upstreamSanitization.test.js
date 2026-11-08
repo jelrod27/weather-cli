@@ -41,6 +41,29 @@ describe('geocode strips terminal control sequences from provider strings', () =
       lon: -0.12
     });
   });
+
+  it.each([undefined, null, '', '   ', '\x1b_hidden payload\x1b\\'])(
+    'uses the sanitized original location when the provider name is %j',
+    async (name) => {
+      get.mockResolvedValue({
+        data: { results: [{ name, latitude: 51.5, longitude: -0.12 }] }
+      });
+
+      const place = await geocode('\x1b[31mLondon\x1b[0m');
+
+      expect(place.name).toBe('London');
+    }
+  );
+
+  it('uses coordinates when both the provider name and input have no display-safe text', async () => {
+    get.mockResolvedValue({
+      data: { results: [{ name: null, latitude: 51.5, longitude: -0.12 }] }
+    });
+
+    const place = await geocode('\x1b[31m\x1b[0m');
+
+    expect(place.name).toBe('51.5, -0.12');
+  });
 });
 
 describe('fetchAlerts strips terminal control sequences from NWS text', () => {
@@ -96,4 +119,20 @@ describe('fetchAlerts strips terminal control sequences from NWS text', () => {
     expect(alert.description).toHaveLength(200);
     expect(alert.description.endsWith('...')).toBe(true);
   });
+
+  it.each([200, 201])(
+    'keeps astral characters intact in a %i-character description',
+    async (length) => {
+      get.mockResolvedValue({
+        data: {
+          features: [{ properties: { event: 'Flood Watch', description: '𠮷'.repeat(length) } }]
+        }
+      });
+
+      const [alert] = await fetchAlerts(32.78, -96.8, 'US');
+
+      expect(alert.description).toBe(length === 200 ? '𠮷'.repeat(200) : '𠮷'.repeat(197) + '...');
+      expect(Array.from(alert.description)).toHaveLength(200);
+    }
+  );
 });

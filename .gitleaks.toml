@@ -2,6 +2,7 @@
 # https://github.com/gitleaks/gitleaks
 
 title = "weather-cli-16bit secret scanning rules"
+minVersion = "v8.30.1"
 
 [extend]
 # Use the default gitleaks rules as a base
@@ -75,7 +76,6 @@ commits = [
     "16680d1",
 ]
 
-# Note: package-lock.json is deliberately not allowlisted here. The upstream
-# default config already skips lock files for entropy noise, and a local
-# allowlist would additionally hide registry credentials (_auth, _authToken)
-# committed into it.
+# Upstream defaults skip lock files globally. CI and pre-commit therefore scan
+# package-lock.json separately with the standalone .gitleaks-lockfiles.toml
+# configuration, which detects npm tokens and registry authentication values.

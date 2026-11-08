@@ -202,8 +202,12 @@ export async function geocode(input) {
   // `weather status`, into shell prompts. Strip terminal control sequences
   // here so every consumer gets display-safe strings.
   const top = filtered[0];
+  const displayName =
+    stripControlChars(top.name, { maxLength: 100 }) ||
+    sanitizeForDisplay(input) ||
+    stripControlChars(`${top.latitude}, ${top.longitude}`, { maxLength: 100 });
   return {
-    name: stripControlChars(top.name, { maxLength: 100 }),
+    name: displayName,
     lat: top.latitude,
     lon: top.longitude,
     country: stripControlChars(top.country_code || '', { maxLength: 8 }),

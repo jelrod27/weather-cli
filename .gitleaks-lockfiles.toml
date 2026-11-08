@@ -1,0 +1,19 @@
+# A separate scan is required: the upstream default globally excludes lock files.
+# Keep this config standalone so those exclusions cannot suppress credentials.
+title = "Lockfile credential scanning"
+minVersion = "v8.30.1"
+
+[[rules]]
+id = "lockfile-npm-access-token"
+description = "npm access token in a lockfile"
+path = '''(?:^|/)package-lock\.json$'''
+regex = '''\bnpm_[A-Za-z0-9]{36}\b'''
+keywords = ["npm_"]
+
+[[rules]]
+id = "lockfile-registry-credential"
+description = "Registry authentication data in a lockfile"
+path = '''(?:^|/)package-lock\.json$'''
+regex = '''(?i)"(?:_authToken|_auth|password)"\s*:\s*"([^"\r\n]+)"'''
+secretGroup = 1
+keywords = ["_authtoken", "_auth", "password"]

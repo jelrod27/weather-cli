@@ -1,9 +1,10 @@
 import { WeatherError, ERROR_CODES } from './errors.js';
 
 const UNSAFE_CHARS_REGEX = /[<>'"{}|\\^`]/g;
-// OSC sequences (ESC ] ... BEL|ST) must be stripped before the generic escape
-// rule, otherwise their payload survives as plain text.
-const OSC_SEQUENCE_REGEX = /\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)?/g;
+// Strip complete control strings before generic escapes, or their payloads
+// survive as plain text. Accept both ESC and C1 forms of the introducer/ST.
+const CONTROL_STRING_REGEX =
+  /(?:\x1b\]|\x9d)[\s\S]*?(?:\x07|\x1b\\|\x9c|$)|(?:\x1b[PX^_]|[\x90\x98\x9e\x9f])[\s\S]*?(?:\x1b\\|\x9c|$)/g;
 // Any remaining escape sequence: CSI, single-character, and orphaned ESC.
 const ESCAPE_SEQUENCE_REGEX = /\x1b(?:\[[0-?]*[ -/]*[@-~]|[@-Z\\-_])?/g;
 // C0 and C1 control characters — terminals act on all of them.
@@ -24,19 +25,17 @@ const MAX_LOCATION_LENGTH = 100;
  */
 export function stripControlChars(str, { maxLength } = {}) {
   const cleaned = String(str ?? '')
-    .replace(OSC_SEQUENCE_REGEX, '')
+    .replace(CONTROL_STRING_REGEX, '')
     .replace(ESCAPE_SEQUENCE_REGEX, '')
     .replace(CONTROL_CHARS_REGEX, '')
     .trim();
-  return maxLength ? cleaned.slice(0, maxLength) : cleaned;
+  return maxLength ? Array.from(cleaned).slice(0, maxLength).join('') : cleaned;
 }
 
 export function sanitizeForDisplay(str) {
   if (typeof str !== 'string') return String(str);
-  return stripControlChars(str)
-    .replace(UNSAFE_CHARS_REGEX, '')
-    .trim()
-    .slice(0, MAX_LOCATION_LENGTH);
+  const cleaned = stripControlChars(str).replace(UNSAFE_CHARS_REGEX, '').trim();
+  return Array.from(cleaned).slice(0, MAX_LOCATION_LENGTH).join('');
 }
 
 export function sanitizeLocation(location) {
