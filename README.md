@@ -1,7 +1,7 @@
 # weather-cli-16bit v0.4.0
 
 [![npm version](https://badge.fury.io/js/weather-cli-16bit.svg)](https://www.npmjs.com/package/weather-cli-16bit)
-[![CI](https://github.com/deephouse23/weather-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/deephouse23/weather-cli/actions/workflows/ci.yml)
+[![CI](https://github.com/jelrod27/weather-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/jelrod27/weather-cli/actions/workflows/ci.yml)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Node.js](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen)
 
@@ -109,7 +109,7 @@ Run `weather <location>` once to warm the cache. Subsequent `weather status` cal
 ## Development
 
 ```bash
-git clone https://github.com/deephouse23/weather-cli.git
+git clone https://github.com/jelrod27/weather-cli.git
 cd weather-cli
 npm install
 npm link                 # expose the `weather` binary locally
@@ -136,5 +136,5 @@ MIT — see [LICENSE](LICENSE).
 ## Links
 
 - npm: [weather-cli-16bit](https://www.npmjs.com/package/weather-cli-16bit)
-- Repo: [github.com/deephouse23/weather-cli](https://github.com/deephouse23/weather-cli)
+- Repo: [github.com/jelrod27/weather-cli](https://github.com/jelrod27/weather-cli)
 - API: [Open-Meteo](https://open-meteo.com) (free, no API key required)
