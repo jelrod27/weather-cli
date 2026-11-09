@@ -6,8 +6,19 @@ updates:
       interval: weekly
     open-pull-requests-limit: 5
     groups:
-      dev-dependencies:
-        dependency-type: development
+      npm-minor-patch:
+        patterns:
+          - '*'
+        update-types:
+          - minor
+          - patch
+      # Keep the test runner and coverage provider on matching major versions.
+      vitest-major:
+        patterns:
+          - vitest
+          - '@vitest/coverage-v8'
+        update-types:
+          - major
 
   # Keeps the SHA-pinned actions in .github/workflows current.
   - package-ecosystem: github-actions
@@ -15,3 +26,7 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    groups:
+      github-actions:
+        patterns:
+          - '*'
