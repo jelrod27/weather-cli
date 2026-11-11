@@ -3,7 +3,7 @@
 [![npm version](https://badge.fury.io/js/weather-cli-16bit.svg)](https://www.npmjs.com/package/weather-cli-16bit)
 [![CI](https://github.com/jelrod27/weather-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/jelrod27/weather-cli/actions/workflows/ci.yml)
 ![License](https://img.shields.io/badge/license-MIT-blue)
-![Node.js](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen)
+![Node.js](https://img.shields.io/badge/node-22.13%2B%20%7C%2024%2B-brightgreen)
 
 An Open-Meteo CLI that parses location words without quotes — `weather San Ramon CA` just works.
 
@@ -15,7 +15,7 @@ An Open-Meteo CLI that parses location words without quotes — `weather San Ram
 npm install -g weather-cli-16bit
 ```
 
-Requires Node.js 20+.
+Requires Node.js 22.13.0 or newer on the 22.x line, or Node.js 24+ (Node.js 23 is unsupported).
 
 ## Usage
 
@@ -130,7 +130,7 @@ npm run dev          node --watch bin/weather.js
 
 Stack: Vitest, ESLint (flat config), Prettier, Husky + lint-staged, Axios, Commander, Inquirer, boxen, chalk.
 
-CI runs lint + the test suite on Node 20/22/24.
+CI runs lint and coverage on Node 22.13.0, plus the test suite on Node 22.13.0, current Node 22, and Node 24.
 
 ## License
 

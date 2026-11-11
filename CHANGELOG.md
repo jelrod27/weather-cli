@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- Restore interactive weather and configuration menus with Inquirer 14 by using its supported select prompt.
+
+### Changed
+
+- Require Node.js 22.13.0+ on the 22.x line or Node.js 24+; Node.js 20 and 23 are no longer supported.
+- Upgrade boxen from 8.0.1 to 9.0.0.
+- Run CI tests on the minimum Node.js 22.13.0 version, current Node.js 22, and Node.js 24.
+
 ## [0.5.0] - 2026-08-01
 
 ### 🏗️ Architecture (deep-module refactor)

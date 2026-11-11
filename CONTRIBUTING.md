@@ -6,7 +6,7 @@ Thank you for your interest in contributing to the Weather CLI! This project is 
 
 ### Prerequisites
 
-- Node.js (v18 or higher)
+- Node.js 22.13.0+ on the 22.x line, or Node.js 24+
 - npm (comes with Node.js)
 - Git
 - A text editor or IDE
