@@ -19,7 +19,7 @@ Single-context: one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agent
 ## Commands
 
 ```bash
-npm install              # Install deps (Node >= 20 required)
+npm install              # Install deps (Node 22.13+ on 22.x, or Node 24+ required)
 npm start                # Run CLI via bin/weather.js
 npm run dev              # Auto-restart with node --watch
 npm test                 # Vitest, single run (CI uses this)
@@ -91,7 +91,7 @@ JSON file in the XDG config directory: `~/.config/weather-cli/config.json` (or `
 
 ## CI / publish flow
 
-- **`.github/workflows/ci.yml`** — lint + format check on Node 20, tests on Node 20/22/24.
+- **`.github/workflows/ci.yml`** — lint + format check on Node 22.13.0, tests on Node 22.13.0 / current 22 / 24.
 - **`.github/workflows/npm-publish.yml`** — on PR merge to `main`/`master`, compares `package.json` version to npm registry version. If they differ, runs tests and `npm publish`, then creates a GitHub release. **Bumping `package.json` version is therefore the trigger to publish.** Don't bump version in casual PRs.
 
 ## Module conventions

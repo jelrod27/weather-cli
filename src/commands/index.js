@@ -198,7 +198,7 @@ async function interactiveMode() {
       default: defaultLocation || 'New York'
     },
     {
-      type: 'list',
+      type: 'select',
       name: 'units',
       message: 'Temperature units:',
       choices: [
@@ -209,7 +209,7 @@ async function interactiveMode() {
       default: defaultUnits
     },
     {
-      type: 'list',
+      type: 'select',
       name: 'forecast',
       message: 'What would you like to see?',
       choices: [
@@ -402,7 +402,7 @@ function registerAll(program) {
           default: (await getDefaultLocation()) || ''
         },
         {
-          type: 'list',
+          type: 'select',
           name: 'defaultUnits',
           message: 'Default temperature units:',
           choices: [
