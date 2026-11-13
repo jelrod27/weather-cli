@@ -161,7 +161,7 @@ function displayCurrentWeather(data, displayUnit, options = {}) {
     `Pressure:   ${weather.main.pressure} hPa ${formatPressureTrend(weather.pressure_trend?.trend, weather.pressure_trend?.delta)}`,
     `Dew Point:  ${formatDewPoint(weather.dew_point, displayUnit)}`,
     `Cloud Cover: ${weather.cloud_cover ?? 'N/A'}%`,
-    `Rain Chance:  ${formatPrecipProbability(weather.precip_probability)}%`,
+    `Rain Chance (daily max): ${formatPrecipProbability(weather.precip_probability)}%`,
     `CAPE:       ${formatCape(weather.cape)}`
   ];
 
