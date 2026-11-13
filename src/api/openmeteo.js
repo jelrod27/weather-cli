@@ -47,7 +47,7 @@ export async function fetchForecast(lat, lon, { tempUnit, windUnit, includeMinut
       'temperature_2m_min',
       'sunrise',
       'sunset',
-      'precipitation_probability'
+      'precipitation_probability_max'
     ].join(','),
     timezone: 'auto',
     timeformat: 'unixtime',

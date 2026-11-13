@@ -9,7 +9,7 @@ vi.mock('../../src/api/http.js', () => ({
 const { fetchForecast, fetchAirQuality, geocode, normalizeToOwmShape } =
   await import('../../src/api/openmeteo.js');
 
-describe('fetchForecast timestamp contract', () => {
+describe('fetchForecast request contract', () => {
   beforeEach(() => {
     get.mockReset();
     get.mockResolvedValue({ data: {} });
@@ -30,6 +30,20 @@ describe('fetchForecast timestamp contract', () => {
         })
       })
     );
+  });
+
+  it('requests the supported daily maximum precipitation probability', async () => {
+    await fetchForecast(51.5, -0.12, { tempUnit: 'celsius', windUnit: 'ms' });
+
+    const { params } = get.mock.calls[0][1];
+    expect(params.daily.split(',')).toEqual([
+      'weather_code',
+      'temperature_2m_max',
+      'temperature_2m_min',
+      'sunrise',
+      'sunset',
+      'precipitation_probability_max'
+    ]);
   });
 });
 
