@@ -25,7 +25,7 @@ weather 94583
 The npm package is named `weather-cli-16bit`; the installed command is `weather`.
 
 ```bash
-weather config                     # choose a default location, units, and cache lifetime
+weather config                     # choose a default location, interactive units, and cache lifetime
 weather                            # interactive mode
 weather --help                     # list commands and options
 weather --version                  # show the installed version
@@ -102,8 +102,9 @@ uses the Open-Meteo Archive API; choose a past date with available data.
 ## Units and JSON
 
 Weather reports for named locations select units from the location automatically.
-Coordinate lookups default to metric. On supported weather commands, override
-the units with:
+Coordinate lookups default to metric. The units saved by `weather config` apply
+to interactive mode; other commands use automatic units unless overridden.
+On supported weather commands, override the units with:
 
 | Option                              | Value                   |
 | ----------------------------------- | ----------------------- |
@@ -115,7 +116,10 @@ the units with:
 Marine and historical weather currently use metric units.
 
 Current weather, forecast, coordinates, radar, watch, and marine commands support
-`--json`. Check a command's help before combining options.
+`--json`. Check a command's help before combining options. Cached commands may
+print a cache message before the JSON, so their stdout is not always valid JSON.
+Watch mode also prints a header and separator before each JSON report; its stdout
+is not a standalone JSON document.
 
 ```bash
 weather London --celsius
@@ -147,7 +151,7 @@ Set a default location and fetch its report first:
 
 ```bash
 weather config
-weather London                         # use the location you set as your default
+weather status --refresh               # fetch the configured default location if needed
 weather status
 weather status --format compact
 weather status --format minimal
