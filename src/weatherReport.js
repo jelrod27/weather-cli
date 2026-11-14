@@ -190,7 +190,7 @@ export function normalizeToOwmShape({ place, forecast, airQuality, windUnit = 'm
       cloud_cover: cur.cloud_cover,
       cape: cur.cape ?? null,
       solar_radiation: hourly.shortwave_radiation?.[curIdx] ?? null,
-      precip_probability: daily.precipitation_probability?.[0],
+      precip_probability: daily.precipitation_probability_max?.[0],
       pressure_trend: pressureTrend,
       dt
     },

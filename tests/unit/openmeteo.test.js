@@ -475,12 +475,12 @@ describe('normalizeToOwmShape', () => {
     expect(data.current.cloud_cover).toBeUndefined();
   });
 
-  it('maps precip_probability from daily forecast data', () => {
+  it.each([30, 0])('maps daily maximum precipitation probability of %i percent', (probability) => {
     const forecastWithPrecip = {
       ...forecast,
       daily: {
         ...forecast.daily,
-        precipitation_probability: [30, 10, 5, 0, 20, 40]
+        precipitation_probability_max: [probability, 10, 5, 0, 20, 40]
       }
     };
     const data = normalizeToOwmShape({
@@ -488,7 +488,7 @@ describe('normalizeToOwmShape', () => {
       forecast: forecastWithPrecip,
       airQuality: { current: null, hourly: {}, daily: {} }
     });
-    expect(data.current.precip_probability).toBe(30);
+    expect(data.current.precip_probability).toBe(probability);
   });
 
   it('sets precip_probability to undefined when not present in daily data', () => {
