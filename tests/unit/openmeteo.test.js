@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { parseLocationQuery, normalizeToOwmShape } from '../../src/api/openmeteo.js';
+import { formatDewPoint } from '../../src/formatters.js';
 
 describe('parseLocationQuery', () => {
   it('parses a plain city name', () => {
@@ -432,6 +433,72 @@ describe('normalizeToOwmShape', () => {
       airQuality: { current: null, hourly: {}, daily: {} }
     });
     expect(data.current.dew_point).toBe(14);
+  });
+
+  it.each([
+    { unit: '°F', value: 50, celsius: 10, metric: '10°C (Dry)', imperial: '50°F (Dry)' },
+    { unit: '°F', value: 32, celsius: 0, metric: '0°C (Dry)', imperial: '32°F (Dry)' },
+    {
+      unit: '°F',
+      value: 0,
+      celsius: -17.7777777778,
+      metric: '-18°C (Dry)',
+      imperial: '0°F (Dry)'
+    },
+    {
+      unit: '°C',
+      value: 14,
+      celsius: 14,
+      metric: '14°C (Comfortable)',
+      imperial: '57°F (Comfortable)'
+    },
+    { unit: '°C', value: 0, celsius: 0, metric: '0°C (Dry)', imperial: '32°F (Dry)' }
+  ])(
+    'normalizes provider dew point $value $unit to Celsius before display',
+    ({ unit, value, celsius, metric, imperial }) => {
+      const data = normalizeToOwmShape({
+        place,
+        forecast: {
+          ...forecast,
+          current_units: { dew_point_2m: unit },
+          current: { ...forecast.current, dew_point_2m: value }
+        },
+        airQuality: { current: null, hourly: {}, daily: {} }
+      });
+
+      expect(data.current.dew_point).toBeCloseTo(celsius);
+      expect(formatDewPoint(data.current.dew_point, 'celsius')).toBe(metric);
+      expect(formatDewPoint(data.current.dew_point, 'fahrenheit')).toBe(imperial);
+    }
+  );
+
+  it.each([undefined, null, {}])(
+    'keeps the Celsius default when current_units is %s',
+    (currentUnits) => {
+      const data = normalizeToOwmShape({
+        place,
+        forecast: { ...forecast, current_units: currentUnits },
+        airQuality: { current: null, hourly: {}, daily: {} }
+      });
+
+      expect(data.current.dew_point).toBe(14);
+      expect(formatDewPoint(data.current.dew_point, 'fahrenheit')).toBe('57°F (Comfortable)');
+    }
+  );
+
+  it.each([null, undefined])('keeps missing Fahrenheit dew point %s unavailable', (value) => {
+    const data = normalizeToOwmShape({
+      place,
+      forecast: {
+        ...forecast,
+        current_units: { dew_point_2m: '°F' },
+        current: { ...forecast.current, dew_point_2m: value }
+      },
+      airQuality: { current: null, hourly: {}, daily: {} }
+    });
+
+    expect(data.current.dew_point).toBe(value);
+    expect(formatDewPoint(data.current.dew_point, 'fahrenheit')).toBe('N/A');
   });
 
   it('sets dew_point to undefined when not present in current weather', () => {

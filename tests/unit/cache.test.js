@@ -97,7 +97,7 @@ describe('loadCache', () => {
 
   it('returns parsed cache object when file exists', async () => {
     const cachedData = {
-      'London-auto': { data: { temp: 20 }, timestamp: Date.now(), schemaVersion: 4 }
+      'London-auto': { data: { temp: 20 }, timestamp: Date.now(), schemaVersion: 5 }
     };
     fs.readFile.mockResolvedValue(JSON.stringify(cachedData));
 
@@ -130,7 +130,7 @@ describe('saveCache (atomic write)', () => {
     fs.rename.mockResolvedValue();
 
     const cache = {
-      'London-auto': { data: { temp: 20 }, timestamp: Date.now(), schemaVersion: 4 }
+      'London-auto': { data: { temp: 20 }, timestamp: Date.now(), schemaVersion: 5 }
     };
     await saveCache(cache);
 
@@ -185,7 +185,7 @@ describe('getCachedWeather', () => {
       'London-auto': {
         data: { current: { temp: 20 } },
         timestamp: Date.now() - 5 * 60 * 1000, // 5 minutes ago
-        schemaVersion: 4
+        schemaVersion: 5
       }
     };
     fs.readFile.mockResolvedValue(JSON.stringify(cachedData));
@@ -199,7 +199,7 @@ describe('getCachedWeather', () => {
       'London-auto': {
         data: { current: { temp: 20 } },
         timestamp: Date.now() - 60 * 60 * 1000, // 1 hour ago (expired)
-        schemaVersion: 4
+        schemaVersion: 5
       }
     };
     fs.readFile.mockResolvedValue(JSON.stringify(cachedData));
@@ -234,6 +234,20 @@ describe('getCachedWeather', () => {
     );
 
     expect(await getCachedWeather('London', 'auto')).toBeNull();
+  });
+
+  it('rejects fresh cached reports with mixed-unit dew point', async () => {
+    fs.readFile.mockResolvedValue(
+      JSON.stringify({
+        'Salt Lake City-imperial': {
+          data: { current: { dew_point: 41.9 }, displayUnit: 'fahrenheit' },
+          timestamp: Date.now(),
+          schemaVersion: 4
+        }
+      })
+    );
+
+    expect(await getCachedWeather('Salt Lake City', 'imperial')).toBeNull();
   });
 
   it('returns null when no cache entry exists', async () => {
@@ -272,7 +286,7 @@ describe('setCachedWeather', () => {
     const parsed = JSON.parse(writtenContent);
     expect(parsed['London-auto']).toBeDefined();
     expect(parsed['London-auto'].data).toEqual({ current: { temp: 20 } });
-    expect(parsed['London-auto'].schemaVersion).toBe(4);
+    expect(parsed['London-auto'].schemaVersion).toBe(5);
   });
 
   it('merges with on-disk cache rather than replacing it', async () => {
@@ -281,7 +295,7 @@ describe('setCachedWeather', () => {
       'Paris-auto': {
         data: { current: { temp: 18 } },
         timestamp: Date.now(),
-        schemaVersion: 4
+        schemaVersion: 5
       }
     };
     fs.readFile.mockResolvedValue(JSON.stringify(diskCache));
@@ -304,7 +318,7 @@ describe('setCachedWeather', () => {
       fullCache[`City${i}-auto`] = {
         data: { temp: i },
         timestamp: Date.now() - i * 1000, // staggered timestamps
-        schemaVersion: 4
+        schemaVersion: 5
       };
     }
     fs.readFile.mockResolvedValue(JSON.stringify(fullCache));
@@ -429,7 +443,7 @@ describe('LRU eviction across invocations', () => {
         data: { temp: i },
         timestamp: now - (100 - i) * 60 * 1000,
         lastAccessed: now - (100 - i) * 60 * 1000,
-        schemaVersion: 4
+        schemaVersion: 5
       };
     }
     fs.readFile.mockResolvedValue(JSON.stringify(fullCache));
@@ -456,7 +470,7 @@ describe('LRU eviction across invocations', () => {
       data: { temp: 0 },
       timestamp: now - 200 * 60 * 1000, // inserted 200 min ago
       lastAccessed: now - 1 * 60 * 1000, // accessed 1 min ago
-      schemaVersion: 4
+      schemaVersion: 5
     };
 
     // City1 was inserted recently (new timestamp) but never re-accessed
@@ -464,7 +478,7 @@ describe('LRU eviction across invocations', () => {
       data: { temp: 1 },
       timestamp: now - 2 * 60 * 1000, // inserted 2 min ago
       lastAccessed: now - 2 * 60 * 1000, // accessed = insertion time (never re-hit)
-      schemaVersion: 4
+      schemaVersion: 5
     };
 
     // Fill up to 100 more entries
@@ -473,7 +487,7 @@ describe('LRU eviction across invocations', () => {
         data: { temp: i },
         timestamp: now - (100 - i) * 60 * 1000,
         lastAccessed: now - 5 * 60 * 1000, // accessed 5 min ago
-        schemaVersion: 4
+        schemaVersion: 5
       };
     }
     fs.readFile.mockResolvedValue(JSON.stringify(fullCache));
@@ -497,7 +511,7 @@ describe('LRU eviction across invocations', () => {
     fullCache['Old-city-auto'] = {
       data: { temp: 0 },
       timestamp: now - 1000 * 60 * 60 * 24 * 6, // 6 days old
-      schemaVersion: 4
+      schemaVersion: 5
       // No lastAccessed — legacy entry
     };
 
@@ -506,7 +520,7 @@ describe('LRU eviction across invocations', () => {
         data: { temp: i },
         timestamp: now - i * 60 * 1000,
         lastAccessed: now - i * 60 * 1000,
-        schemaVersion: 4
+        schemaVersion: 5
       };
     }
     fs.readFile.mockResolvedValue(JSON.stringify(fullCache));
@@ -528,7 +542,7 @@ describe('LRU eviction across invocations', () => {
         data: { current: { temp: 20 } },
         timestamp: now - 10 * 60 * 1000,
         lastAccessed: now - 10 * 60 * 1000, // 10 min ago — past the 5-min threshold
-        schemaVersion: 4
+        schemaVersion: 5
       }
     };
     fs.readFile.mockResolvedValue(JSON.stringify(cachedData));
@@ -553,7 +567,7 @@ describe('LRU eviction across invocations', () => {
         data: { current: { temp: 20 } },
         timestamp: now - 10 * 60 * 1000,
         lastAccessed: now - 1 * 60 * 1000, // 1 min ago — within the 5-min threshold
-        schemaVersion: 4
+        schemaVersion: 5
       }
     };
     fs.readFile.mockResolvedValue(JSON.stringify(cachedData));
@@ -594,7 +608,7 @@ describe('race condition safety', () => {
       'Paris-auto': {
         data: { current: { temp: 18 } },
         timestamp: Date.now(),
-        schemaVersion: 4
+        schemaVersion: 5
       }
     };
 
