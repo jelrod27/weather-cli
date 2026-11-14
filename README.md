@@ -43,7 +43,7 @@ Publishing a release does not automatically update an already installed CLI.
 ## Everyday examples
 
 ```bash
-weather forecast Tokyo                     # next 24 hours
+weather forecast san ramon ca               # next 24 hours, no quotes needed
 weather 5day Paris                          # five-day forecast
 weather now "San Ramon CA" --fahrenheit     # force Fahrenheit
 weather compare "New York" London          # compare two locations
@@ -53,30 +53,32 @@ weather London --art --animate              # animate the scene in an interactiv
 weather now London --json                   # request JSON weather data
 ```
 
-The root command accepts several location words without quotes. For subcommands,
-quote locations containing spaces, such as `weather forecast "San Ramon CA"`.
-Put options after the subcommand: `weather now London --fahrenheit --json`.
+Location-taking commands accept several words without quotes, including
+`weather forecast san ramon ca`. `forecast` is a subcommand: start it with
+`weather forecast`. For `weather compare`, quote each multiword city so the two
+locations stay separate. Put options after the subcommand:
+`weather now London --fahrenheit --json`.
 
 ## Commands
 
-| Command                                        | What it does                                                  |
-| ---------------------------------------------- | ------------------------------------------------------------- |
-| `weather [location...]`                        | Show current conditions; no arguments starts interactive mode |
-| `weather now [location]`                       | Show current conditions explicitly                            |
-| `weather forecast [location]`                  | Show the next 24 hours                                        |
-| `weather 5day [location]`                      | Show the five-day forecast                                    |
-| `weather compare <city1> <city2>`              | Compare weather in two locations                              |
-| `weather coords <lat,lon>`                     | Look up weather by coordinates                                |
-| `weather radar [location]`                     | Show precipitation information for the next hour              |
-| `weather watch [location]`                     | Refresh the weather display on an interval                    |
-| `weather marine [location]`                    | Show wave and ocean conditions for a coastal location         |
-| `weather history [location] --date YYYY-MM-DD` | Show historical weather for one date                          |
-| `weather status [location...]`                 | Print a compact line for a shell prompt or tmux               |
-| `weather config`                               | Set a default location, units, and cache lifetime             |
-| `weather cache`                                | Show cache statistics                                         |
-| `weather cache --clear`                        | Clear the cache (`-c` is the short form)                      |
-| `weather cache --clean`                        | Remove expired cache entries                                  |
-| `weather interactive` or `weather i`           | Start interactive mode                                        |
+| Command                                           | What it does                                                  |
+| ------------------------------------------------- | ------------------------------------------------------------- |
+| `weather [location...]`                           | Show current conditions; no arguments starts interactive mode |
+| `weather now [location...]`                       | Show current conditions explicitly                            |
+| `weather forecast [location...]`                  | Show the next 24 hours                                        |
+| `weather 5day [location...]`                      | Show the five-day forecast                                    |
+| `weather compare <city1> <city2>`                 | Compare weather in two locations                              |
+| `weather coords <lat,lon>`                        | Look up weather by coordinates                                |
+| `weather radar [location...]`                     | Show precipitation information for the next hour              |
+| `weather watch [location...]`                     | Refresh the weather display on an interval                    |
+| `weather marine [location...]`                    | Show wave and ocean conditions for a coastal location         |
+| `weather history [location...] --date YYYY-MM-DD` | Show historical weather for one date                          |
+| `weather status [location...]`                    | Print a compact line for a shell prompt or tmux               |
+| `weather config`                                  | Set a default location, units, and cache lifetime             |
+| `weather cache`                                   | Show cache statistics                                         |
+| `weather cache --clear`                           | Clear the cache (`-c` is the short form)                      |
+| `weather cache --clean`                           | Remove expired cache entries                                  |
+| `weather interactive` or `weather i`              | Start interactive mode                                        |
 
 For commands with an optional location, set a default with `weather config` to
 avoid supplying it each time. Run `weather <command> --help` for the options
@@ -185,6 +187,11 @@ The default files are:
 
 `XDG_CONFIG_HOME` and `XDG_CACHE_HOME` override those base directories. Use
 `weather cache --clear` to discard cached reports before the next lookup.
+
+Weather lookups retry transient failures, including timed-out GET requests, up to
+three times. Each attempt has a five-second timeout. Retry messages go to stderr;
+if every attempt fails, the command reports a network error. Persistent timeouts
+can still require checking your connection or waiting for the provider to recover.
 
 ## Releases and this README
 

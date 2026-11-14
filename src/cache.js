@@ -15,9 +15,9 @@ const FILE_MODE = 0o600;
 const DEFAULT_CACHE_EXPIRY = 30 * 60 * 1000; // 30 minutes
 const MAX_CACHE_SIZE = 100; // Maximum number of entries
 const MAX_CACHE_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days
-// Version 4 invalidates entries created before provider text sanitization.
+// Version 5 invalidates reports with dew point stored in provider-dependent units.
 // Bump when the cached `data` shape changes. Old entries are discarded on read.
-const CACHE_SCHEMA_VERSION = 4;
+const CACHE_SCHEMA_VERSION = 5;
 
 // Resolve the effective cache TTL from config, falling back to the default.
 // Config value `cacheTtl` is in minutes. Clamped to [1, 1440] (1 min to 24h).

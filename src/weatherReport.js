@@ -9,6 +9,7 @@ import { wmoToOwm, usAqiToOwmAqi } from './api/wmoToOwm.js';
  * This module owns the shape. openmeteo.js builds one via normalizeToOwmShape;
  * display.js and status.js consume one. The OWM-compatibility shape is an
  * implementation detail of the adapter, not a contract callers memorize.
+ * current.dew_point is Celsius; other temperatures use the requested units.
  *
  * Shape:
  *   {
@@ -66,6 +67,13 @@ export function normalizeToOwmShape({ place, forecast, airQuality, windUnit = 'm
   const curWmo = wmoToOwm(cur.weather_code);
   const curIdx = nearestHourlyIndex(hourly.time || [], cur.time);
   const visibilityMeters = hourly.visibility?.[curIdx] ?? 10000;
+  // Dew point formatting and comfort thresholds use Celsius in every display unit.
+  // Without unit metadata, retain Open-Meteo's default Celsius interpretation.
+  const dewPoint = cur.dew_point_2m;
+  const dewPointCelsius =
+    forecast.current_units?.dew_point_2m === '°F' && Number.isFinite(dewPoint)
+      ? ((dewPoint - 32) * 5) / 9
+      : dewPoint;
   // Compute barometric pressure trend (3-hour tendency)
   const curPressure = cur.pressure_msl ?? null;
   const hourlyPressures = hourly.pressure_msl || [];
@@ -186,7 +194,7 @@ export function normalizeToOwmShape({ place, forecast, airQuality, windUnit = 'm
       weather: [curWmo],
       uv_index: cur.uv_index,
       visibility: visibilityMeters,
-      dew_point: cur.dew_point_2m,
+      dew_point: dewPointCelsius,
       cloud_cover: cur.cloud_cover,
       cape: cur.cape ?? null,
       solar_radiation: hourly.shortwave_radiation?.[curIdx] ?? null,
