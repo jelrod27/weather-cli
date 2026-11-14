@@ -132,6 +132,9 @@ Stack: Vitest, ESLint (flat config), Prettier, Husky + lint-staged, Axios, Comma
 
 CI runs lint + the test suite on Node 20/22/24.
 
+Merges to `main` publish a new npm patch version after CI succeeds. See the
+[release guide](docs/releasing.md) for versioning, npm setup, and retry instructions.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
