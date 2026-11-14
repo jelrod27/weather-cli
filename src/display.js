@@ -155,11 +155,11 @@ function displayCurrentWeather(data, displayUnit, options = {}) {
   const left = [
     chalk.gray(weather.weather[0].description),
     formatTemp(weather.main.temp, displayUnit, { colorCode: true, type: 'current' }),
-    `Feels Like: ${formatFeelsLike(weather.main.feels_like, displayUnit)}`,
-    `Humidity:   ${weather.main.humidity}%`,
-    `UV Index:   ${formatUvIndex(weather.uv_index)}`,
-    `Pressure:   ${weather.main.pressure} hPa ${formatPressureTrend(weather.pressure_trend?.trend, weather.pressure_trend?.delta)}`,
-    `Dew Point:  ${formatDewPoint(weather.dew_point, displayUnit)}`,
+    `${chalk.bold('Feels Like:')} ${formatFeelsLike(weather.main.feels_like, displayUnit)}`,
+    `${chalk.bold('Humidity:')}   ${weather.main.humidity}%`,
+    `${chalk.bold('UV Index:')}   ${formatUvIndex(weather.uv_index)}`,
+    `${chalk.bold('Pressure:')}   ${weather.main.pressure} hPa ${formatPressureTrend(weather.pressure_trend?.trend, weather.pressure_trend?.delta)}`,
+    `${chalk.bold('Dew Point:')}  ${formatDewPoint(weather.dew_point, displayUnit)}`,
     `Cloud Cover: ${weather.cloud_cover ?? 'N/A'}%`,
     `Rain Chance (daily max): ${formatPrecipProbability(weather.precip_probability)}%`,
     `CAPE:       ${formatCape(weather.cape)}`
