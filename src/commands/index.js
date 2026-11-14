@@ -73,8 +73,9 @@ async function buildArtOptions(options) {
   };
 }
 
-async function resolveLocation(provided) {
-  if (provided) return provided;
+async function resolveLocation(locationWords) {
+  const location = parseLocation(locationWords);
+  if (location) return location;
   const defaultLocation = await getDefaultLocation();
   if (defaultLocation) return defaultLocation;
   console.error(chalk.red('❌ No location provided and no default set'));
@@ -198,7 +199,7 @@ async function interactiveMode() {
       default: defaultLocation || 'New York'
     },
     {
-      type: 'list',
+      type: 'select',
       name: 'units',
       message: 'Temperature units:',
       choices: [
@@ -209,7 +210,7 @@ async function interactiveMode() {
       default: defaultUnits
     },
     {
-      type: 'list',
+      type: 'select',
       name: 'forecast',
       message: 'What would you like to see?',
       choices: [
@@ -278,9 +279,9 @@ function registerAll(program) {
   // now
   withArtOptions(
     withUnitOptions(
-      program.command('now [location]').description('Get current weather for a location')
+      program.command('now [location...]').description('Get current weather for a location')
     )
-  ).action(async (location, options) => {
+  ).action(async (locationWords, options) => {
     if (options.listThemes) {
       listThemes();
       return;
@@ -289,16 +290,16 @@ function registerAll(program) {
       previewThemes();
       return;
     }
-    const loc = await resolveLocation(location);
+    const loc = await resolveLocation(locationWords);
     await runCurrentCommand(loc, options);
   });
 
   // forecast
   withArtOptions(
     withUnitOptions(
-      program.command('forecast [location]').description('Get 24-hour forecast for a location')
+      program.command('forecast [location...]').description('Get 24-hour forecast for a location')
     )
-  ).action(async (location, options) => {
+  ).action(async (locationWords, options) => {
     if (options.listThemes) {
       listThemes();
       return;
@@ -307,7 +308,7 @@ function registerAll(program) {
       previewThemes();
       return;
     }
-    const loc = await resolveLocation(location);
+    const loc = await resolveLocation(locationWords);
     const userUnits = processTemperatureOptions(options);
     const artOpts = await buildArtOptions(options);
     const data = await fetchWithCache(loc, userUnits);
@@ -322,9 +323,9 @@ function registerAll(program) {
   // 5day
   withArtOptions(
     withUnitOptions(
-      program.command('5day [location]').description('Get 5-day forecast for a location')
+      program.command('5day [location...]').description('Get 5-day forecast for a location')
     )
-  ).action(async (location, options) => {
+  ).action(async (locationWords, options) => {
     if (options.listThemes) {
       listThemes();
       return;
@@ -333,7 +334,7 @@ function registerAll(program) {
       previewThemes();
       return;
     }
-    const loc = await resolveLocation(location);
+    const loc = await resolveLocation(locationWords);
     const userUnits = processTemperatureOptions(options);
     const artOpts = await buildArtOptions(options);
     const data = await fetchWithCache(loc, userUnits);
@@ -375,9 +376,9 @@ function registerAll(program) {
 
   // radar
   withUnitOptions(
-    program.command('radar [location]').description('Show precipitation radar for the next hour')
-  ).action(async (location, options) => {
-    const loc = await resolveLocation(location);
+    program.command('radar [location...]').description('Show precipitation radar for the next hour')
+  ).action(async (locationWords, options) => {
+    const loc = await resolveLocation(locationWords);
     const userUnits = processTemperatureOptions(options);
     // Always fetch fresh data for radar — minute-level precipitation changes fast
     const data = await getWeather(loc, userUnits, { includeMinutely: true });
@@ -402,7 +403,7 @@ function registerAll(program) {
           default: (await getDefaultLocation()) || ''
         },
         {
-          type: 'list',
+          type: 'select',
           name: 'defaultUnits',
           message: 'Default temperature units:',
           choices: [
@@ -481,12 +482,12 @@ function registerAll(program) {
   withArtOptions(
     withUnitOptions(
       program
-        .command('watch [location]')
+        .command('watch [location...]')
         .description('Watch current weather — auto-refreshes the display on an interval')
         .option('-i, --interval <minutes>', 'Refresh interval in minutes (1-60)', '5')
     )
-  ).action(async (location, options) => {
-    const loc = await resolveLocation(location);
+  ).action(async (locationWords, options) => {
+    const loc = await resolveLocation(locationWords);
 
     const intervalMinutes = parseWatchInterval(options.interval);
     const intervalMs = intervalMinutes * 60 * 1000;
@@ -543,12 +544,12 @@ function registerAll(program) {
   // marine
   withUnitOptions(
     program
-      .command('marine [location]')
+      .command('marine [location...]')
       .description(
         'Show marine/ocean conditions (wave height, direction, period, sea surface temp) for a coastal location'
       )
-  ).action(async (location, options) => {
-    const loc = await resolveLocation(location);
+  ).action(async (locationWords, options) => {
+    const loc = await resolveLocation(locationWords);
     const place = await geocode(loc);
     const marine = await fetchMarine(place.lat, place.lon);
 
@@ -567,10 +568,10 @@ function registerAll(program) {
 
   // history
   program
-    .command('history [location]')
+    .command('history [location...]')
     .description('Show historical weather for a given date (Open-Meteo Archive API)')
     .option('-d, --date <YYYY-MM-DD>', 'Date to fetch (required, format YYYY-MM-DD)')
-    .action(async (location, options) => {
+    .action(async (locationWords, options) => {
       if (!options.date) {
         console.error(chalk.red('❌ --date <YYYY-MM-DD> is required for the history command'));
         console.log(chalk.yellow('Example: weather history --date 2023-07-15 "San Ramon, CA"'));
@@ -590,7 +591,7 @@ function registerAll(program) {
         process.exit(6);
       }
 
-      const loc = await resolveLocation(location);
+      const loc = await resolveLocation(locationWords);
       const place = await geocode(loc);
       const data = await fetchHistorical(place.lat, place.lon, options.date);
 

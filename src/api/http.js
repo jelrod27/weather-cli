@@ -28,8 +28,15 @@ httpClient.interceptors.request.use((config) => {
 // Configure retry logic
 axiosRetry(httpClient, {
   retries: 3,
+  shouldResetTimeout: true,
   retryDelay: axiosRetry.exponentialDelay,
   retryCondition: (error) => {
+    // A timeout exhausts its attempt's deadline, not the whole retry budget.
+    // Retry reads only; replaying a timed-out write could duplicate an action.
+    if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
+      return error.config?.method === 'get';
+    }
+
     // Retry on network errors
     if (axiosRetry.isNetworkError(error)) {
       return true;
@@ -44,7 +51,7 @@ axiosRetry(httpClient, {
     return false;
   },
   onRetry: (retryCount, error) => {
-    console.log(`Retry attempt ${retryCount} after error: ${error.message}`);
+    console.error(`Retry attempt ${retryCount} after error: ${error.message}`);
   }
 });
 

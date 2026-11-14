@@ -14,6 +14,14 @@ describe('parseLocation', () => {
     it('returns plain text for unrecognized single-word locations', () => {
       expect(parseLocation(['Timbuktu'])).toBe('Timbuktu');
     });
+
+    it.each(['metric', 'imperial', 'celsius', 'fahrenheit', 'auto'])(
+      'preserves the positional city name %s',
+      (name) => {
+        expect(parseLocation([name])).toBe(name);
+        expect(parseLocation([name, 'ca'])).toBe(`${name} ca`);
+      }
+    );
   });
 
   describe('option filtering', () => {
@@ -21,9 +29,14 @@ describe('parseLocation', () => {
       expect(parseLocation(['San', 'Ramon', 'CA', '--celsius'])).toBe('San Ramon CA');
     });
 
-    it('filters out unit keywords', () => {
+    it('filters unit values following the short unit option', () => {
       expect(parseLocation(['-u', 'metric', 'London'])).toBe('London');
       expect(parseLocation(['Paris', '--fahrenheit', '-f'])).toBe('Paris');
+    });
+
+    it('filters unit values following the long unit option', () => {
+      expect(parseLocation(['--units', 'metric', 'imperial', 'ca'])).toBe('imperial ca');
+      expect(parseLocation(['imperial', 'ca', '--units=metric'])).toBe('imperial ca');
     });
   });
 
