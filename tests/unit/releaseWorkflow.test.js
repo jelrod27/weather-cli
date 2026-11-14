@@ -15,13 +15,15 @@ const workflow = readFileSync(
 function runStep(name, env = {}) {
   const step = workflow.split(`- name: ${name}\n`)[1].split(/\n      - name:/)[0];
   const run = step.split('        run: ')[1];
-  const script = run.startsWith('|\n')
-    ? run
-        .slice(2)
-        .split('\n')
-        .map((line) => line.slice(10))
-        .join('\n')
-    : run.split('\n')[0];
+  let script = run.split('\n')[0];
+  if (run.startsWith('|\n')) {
+    const lines = [];
+    for (const line of run.slice(2).split('\n')) {
+      if (line.trim() && !line.startsWith('          ')) break;
+      lines.push(line.slice(10));
+    }
+    script = lines.join('\n');
+  }
   const directory = mkdtempSync(join(tmpdir(), 'weather-workflow-'));
   const executable = (name, body) => {
     const path = join(directory, name);
@@ -58,6 +60,8 @@ esac`
         GH_REPO: 'jelrod27/weather-cli',
         VERSION: '0.5.1',
         DIST_TAG: 'latest',
+        GITHUB_RUN_ATTEMPT: '1',
+        VALIDATION_ATTEMPT: '1',
         RUNNER_TEMP: directory,
         GITHUB_STEP_SUMMARY: join(directory, 'summary'),
         TAG_COUNT: '0',
@@ -76,6 +80,25 @@ esac`
 describe.skipIf(process.platform === 'win32')('release workflow shell', () => {
   it('passes the validated source SHA to npm provenance generation', () => {
     const result = runStep('Publish to npm using trusted publishing');
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.calls).toEqual([source]);
+  });
+
+  it('rejects a publish retry using an earlier validation attempt before invoking npm', () => {
+    const result = runStep('Publish to npm using trusted publishing', {
+      GITHUB_RUN_ATTEMPT: '2',
+      VALIDATION_ATTEMPT: '1'
+    });
+    expect(result.status).not.toBe(0);
+    expect(result.calls).toEqual(['']);
+    expect(result.stdout).toContain('Re-run all jobs');
+  });
+
+  it('publishes when validation has rerun in the same attempt', () => {
+    const result = runStep('Publish to npm using trusted publishing', {
+      GITHUB_RUN_ATTEMPT: '2',
+      VALIDATION_ATTEMPT: '2'
+    });
     expect(result.status, result.stderr).toBe(0);
     expect(result.calls).toEqual([source]);
   });

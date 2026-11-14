@@ -26,6 +26,7 @@ jobs:
       version: ${{ steps.release.outputs.version }}
       should_publish: ${{ steps.release.outputs.should_publish }}
       dist_tag: ${{ steps.release.outputs.dist_tag }}
+      validation_attempt: ${{ steps.release.outputs.validation_attempt }}
     steps:
       - name: Checkout the commit that passed CI
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -46,7 +47,9 @@ jobs:
 
       - name: Plan release and update build version
         id: release
-        run: node scripts/prepare-release.js --write
+        run: |
+          node scripts/prepare-release.js --write
+          echo "validation_attempt=$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
 
       - name: Validate the versioned package
         if: steps.release.outputs.should_publish == 'true'
@@ -93,10 +96,16 @@ jobs:
       # No checkout, dependency installs, lifecycle execution, or long-lived token.
       - name: Publish to npm using trusted publishing
         # workflow_run's default GITHUB_SHA may be newer than the validated source.
-        run: GITHUB_SHA="$SOURCE_SHA" npm publish "$RUNNER_TEMP/weather-package/"*.tgz --ignore-scripts --provenance --access public --tag "$DIST_TAG"
+        run: |
+          if [ "$VALIDATION_ATTEMPT" != "$GITHUB_RUN_ATTEMPT" ]; then
+            echo "::error::Re-run all jobs so release version and ordering are validated for this attempt."
+            exit 1
+          fi
+          GITHUB_SHA="$SOURCE_SHA" npm publish "$RUNNER_TEMP/weather-package/"*.tgz --ignore-scripts --provenance --access public --tag "$DIST_TAG"
         env:
           SOURCE_SHA: ${{ github.event.workflow_run.head_sha }}
           DIST_TAG: ${{ needs.validate.outputs.dist_tag }}
+          VALIDATION_ATTEMPT: ${{ needs.validate.outputs.validation_attempt }}
           CI: true
 
   release:

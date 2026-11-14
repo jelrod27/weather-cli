@@ -39,6 +39,11 @@ and configure a **GitHub Actions trusted publisher**:
 | Repository           | `weather-cli`     |
 | Workflow filename    | `npm-publish.yml` |
 | Environment          | Leave empty       |
+| Allow npm publish    | Enabled           |
+
+Enable **Allow npm publish** under **Allowed actions** before saving the
+connection. Staged publishing alone does not authorize this workflow's direct
+publishes. The separate **Allow npm dist-tag** permission is not required.
 
 The workflow uses GitHub-hosted runners, Node 24 (npm >= 11.5.1),
 `id-token: write`, and provenance. It needs no `NPM_TOKEN` secret. The package's
@@ -54,6 +59,11 @@ is required to confirm the npm configuration.
 Release runs are serialized with `concurrency.queue: max`. GitHub retains up to
 100 pending runs in this queue; excess runs are canceled and need their CI run
 rerun when capacity is available.
+
+If the npm publish job fails, choose **Re-run all jobs**. The publish step
+requires validation outputs from the current run attempt; retrying only the
+failed publish job is rejected before npm is invoked. This forces version and
+ordering to be recalculated after any intervening release.
 
 If npm succeeds but creating the GitHub Release fails, rerun **all jobs** of the
 failed **NPM Publish** run. The source commit in npm metadata identifies the
