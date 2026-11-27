@@ -408,16 +408,24 @@ function renderForecastList(items, displayUnit) {
 function displayMinutelyForecast(data, _displayUnit) {
   const minutely = data.minutely || {};
   const precip = minutely.precipitation || [];
+  const reference = data.current?.dt;
+  const interval = 15 * 60;
+  const firstEnd = (Math.floor(reference / interval) + 1) * interval;
+  const finalEnd = firstEnd + 3 * interval;
+  // Open-Meteo timestamps label the end of each preceding 15-minute accumulation.
+  const values = (minutely.time || []).flatMap((time, index) => {
+    const end = typeof time === 'number' ? time : Date.parse(time) / 1000;
+    return end >= firstEnd && end <= finalEnd && (end - firstEnd) % interval === 0
+      ? [precip[index]]
+      : [];
+  });
 
-  if (precip.length === 0) {
+  if (precip.length === 0 || values.length === 0) {
     console.log(chalk.yellow('📦 No minutely precipitation data available for this location.'));
     return;
   }
 
-  // Show up to 4 intervals (60 minutes). The API may return more; we take
-  // the first 4 which correspond to the next hour.
-  const maxIntervals = Math.min(precip.length, 4);
-  const values = precip.slice(0, maxIntervals);
+  const maxIntervals = values.length;
 
   // If all values are zero or the array is too short, still show the chart
   // but indicate no precipitation expected.

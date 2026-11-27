@@ -269,6 +269,27 @@ describe('degToCardinal', () => {
 });
 
 describe('displayMinutelyForecast', () => {
+  it('uses the next four intervals, not dry samples from earlier that day', () => {
+    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const current = Date.parse('2026-05-29T12:00:00Z') / 1000;
+    try {
+      displayMinutelyForecast({
+        current: { dt: current },
+        minutely: {
+          time: [-43200, -42300, -41400, -40500, 0, 900, 1800, 2700, 3600, 4500].map(
+            (offset) => current + offset
+          ),
+          precipitation: [0, 0, 0, 0, 5, 0, 2, 0, 0, 9]
+        }
+      });
+      const output = spy.mock.calls.flat().join('\n');
+      expect(output).toContain('Peak: 2.0 mm/15min');
+      expect(output).not.toContain('No rain next hour');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it('outputs a message when no minutely data is available', () => {
     const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
     displayMinutelyForecast({}, 'celsius');
@@ -291,8 +312,14 @@ describe('displayMinutelyForecast', () => {
     const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
     displayMinutelyForecast(
       {
+        current: { dt: Date.parse('2026-05-29T11:45:00Z') / 1000 },
         minutely: {
-          time: ['2026-05-29T12:00', '2026-05-29T12:15', '2026-05-29T12:30', '2026-05-29T12:45'],
+          time: [
+            '2026-05-29T12:00:00Z',
+            '2026-05-29T12:15:00Z',
+            '2026-05-29T12:30:00Z',
+            '2026-05-29T12:45:00Z'
+          ],
           precipitation: [0, 0.5, 1.2, 0.3]
         }
       },
@@ -311,8 +338,14 @@ describe('displayMinutelyForecast', () => {
     const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
     displayMinutelyForecast(
       {
+        current: { dt: Date.parse('2026-05-29T11:45:00Z') / 1000 },
         minutely: {
-          time: ['2026-05-29T12:00', '2026-05-29T12:15', '2026-05-29T12:30', '2026-05-29T12:45'],
+          time: [
+            '2026-05-29T12:00:00Z',
+            '2026-05-29T12:15:00Z',
+            '2026-05-29T12:30:00Z',
+            '2026-05-29T12:45:00Z'
+          ],
           precipitation: [0, 0, 0, 0]
         }
       },
@@ -329,8 +362,9 @@ describe('displayMinutelyForecast', () => {
     const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
     displayMinutelyForecast(
       {
+        current: { dt: Date.parse('2026-05-29T11:45:00Z') / 1000 },
         minutely: {
-          time: ['2026-05-29T12:00'],
+          time: ['2026-05-29T12:00:00Z'],
           precipitation: [2.5]
         }
       },
@@ -346,8 +380,9 @@ describe('displayMinutelyForecast', () => {
     const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
     displayMinutelyForecast(
       {
+        current: { dt: Date.parse('2026-05-29T11:45:00Z') / 1000 },
         minutely: {
-          time: ['2026-05-29T12:00', '2026-05-29T12:15'],
+          time: ['2026-05-29T12:00:00Z', '2026-05-29T12:15:00Z'],
           precipitation: [0.1, 1.0]
         }
       },
