@@ -159,10 +159,21 @@ describe('CLI location dispatch', () => {
     expect(getWeather).not.toHaveBeenCalled();
   });
 
+  it.each(['37.77junk,-122.42', '37.77,-122.42,8', '37.77,'])(
+    'rejects an invalid coordinate pair before reading the cache: %s',
+    async (coordinates) => {
+      await expect(runCommand(['coords', coordinates])).rejects.toMatchObject({
+        code: 'INVALID_INPUT'
+      });
+      expect(getCachedWeather).not.toHaveBeenCalled();
+      expect(getWeatherByCoords).not.toHaveBeenCalled();
+    }
+  );
+
   it('continues to dispatch coordinate pairs without location parsing', async () => {
     await runCommand(['coords', '37.77,-122.42']);
 
-    expect(getWeatherByCoords).toHaveBeenCalledWith('37.77', '-122.42', null);
+    expect(getWeatherByCoords).toHaveBeenCalledWith(37.77, -122.42, null);
     expect(getWeather).not.toHaveBeenCalled();
   });
 });

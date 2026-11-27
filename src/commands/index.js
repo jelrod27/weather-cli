@@ -27,7 +27,7 @@ import {
 } from '../config.js';
 import { WeatherError, mapErrorToExitCode } from '../utils/errors.js';
 import { parseLocation } from '../utils/locationParser.js';
-import { parseWatchInterval } from '../utils/validators.js';
+import { parseCoordinatePair, parseWatchInterval } from '../utils/validators.js';
 import { runStatus } from './status.js';
 import { geocode } from '../api/openmeteo.js';
 import { fetchHistorical, isValidDate } from '../api/historical.js';
@@ -361,7 +361,7 @@ function registerAll(program) {
         .description('Get weather by GPS coordinates (format: lat,lon)')
     )
   ).action(async (coordinates, options) => {
-    const [lat, lon] = coordinates.split(',').map((c) => c.trim());
+    const { latitude: lat, longitude: lon } = parseCoordinatePair(coordinates);
     const userUnits = processTemperatureOptions(options);
     const artOpts = await buildArtOptions(options);
     const data = await fetchWithCache(`${lat},${lon}`, userUnits, {
