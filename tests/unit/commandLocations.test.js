@@ -152,6 +152,19 @@ describe('CLI location dispatch', () => {
     expect(getWeather).toHaveBeenNthCalledWith(2, 'New York NY', null);
   });
 
+  it.each([
+    [68, 20, 'Both cities have the same temperature!'],
+    [50, 20, 'London is warmer by 18.0°']
+  ])('compares %s°F and %s°C in the same unit', async (us, uk, message) => {
+    getWeather.mockResolvedValueOnce({
+      current: { main: { temp: us } },
+      displayUnit: 'fahrenheit'
+    });
+    getWeather.mockResolvedValueOnce({ current: { main: { temp: uk } }, displayUnit: 'celsius' });
+    await runCommand(['compare', 'San Ramon CA', 'London']);
+    expect(console.log).toHaveBeenCalledWith(expect.stringContaining(message));
+  });
+
   it('rejects ambiguous unquoted compare locations', async () => {
     await expect(runCommand(['compare', 'San', 'Ramon', 'New', 'York'])).rejects.toMatchObject({
       code: 'commander.excessArguments'

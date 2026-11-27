@@ -27,6 +27,7 @@ import {
 } from '../config.js';
 import { WeatherError, mapErrorToExitCode } from '../utils/errors.js';
 import { parseLocation } from '../utils/locationParser.js';
+import { convertTemperature } from '../units.js';
 import { parseCoordinatePair, parseWatchInterval } from '../utils/validators.js';
 import { runStatus } from './status.js';
 import { geocode } from '../api/openmeteo.js';
@@ -174,14 +175,22 @@ async function compareWeather(city1, city2, options) {
 
   const temp1 = data1.current.main.temp;
   const temp2 = data2.current.main.temp;
-  const diff = Math.abs(temp1 - temp2);
+  if (!Number.isFinite(temp1) || !Number.isFinite(temp2)) {
+    console.log(chalk.yellow('Temperature difference unavailable.'));
+    return;
+  }
+
+  // Compare in City 1's display unit, at the precision used in the summary.
+  const secondInFirstUnit = convertTemperature(temp2, data2.displayUnit, data1.displayUnit);
+  const delta = temp1 - secondInFirstUnit;
+  const diff = Math.abs(delta).toFixed(1);
   const unit = data1.displayUnit === 'fahrenheit' ? 'F' : 'C';
 
-  console.log(chalk.yellow(`\n🌡️  Temperature difference: ${diff.toFixed(1)}°${unit}`));
-  if (temp1 > temp2) {
-    console.log(chalk.red(`${city1} is warmer by ${diff.toFixed(1)}°`));
-  } else if (temp2 > temp1) {
-    console.log(chalk.red(`${city2} is warmer by ${diff.toFixed(1)}°`));
+  console.log(chalk.yellow(`\n🌡️  Temperature difference: ${diff}°${unit}`));
+  if (diff !== '0.0' && delta > 0) {
+    console.log(chalk.red(`${city1} is warmer by ${diff}°`));
+  } else if (diff !== '0.0' && delta < 0) {
+    console.log(chalk.red(`${city2} is warmer by ${diff}°`));
   } else {
     console.log(chalk.green('Both cities have the same temperature!'));
   }
