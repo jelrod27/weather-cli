@@ -9,6 +9,8 @@
  * Re-exported from weather.js and config.js for backward compatibility.
  */
 
+import { WeatherError, ERROR_CODES } from './utils/errors.js';
+
 // Regional temperature units mapping (US + a handful of US-aligned territories)
 const FAHRENHEIT_COUNTRIES = new Set(['US', 'USA', 'BS', 'BZ', 'KY', 'PW']);
 
@@ -59,10 +61,22 @@ function unitsForOpenMeteo(unitSystem) {
 function processTemperatureOptions(options) {
   if (options.celsius) return 'celsius';
   if (options.fahrenheit) return 'fahrenheit';
-  if (options.units && options.units !== 'auto') {
-    return options.units === 'metric' ? 'celsius' : 'fahrenheit';
+  switch (options.units) {
+    case 'metric':
+    case 'celsius':
+      return 'celsius';
+    case 'imperial':
+    case 'fahrenheit':
+      return 'fahrenheit';
+    case undefined:
+    case 'auto':
+      return null;
+    default:
+      throw new WeatherError(
+        'Invalid units. Choose auto, metric, imperial, celsius, or fahrenheit.',
+        ERROR_CODES.INVALID_INPUT
+      );
   }
-  return null; // Use auto-detection
 }
 
 export {
