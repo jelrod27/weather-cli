@@ -411,24 +411,32 @@ function displayMinutelyForecast(data, _displayUnit) {
   const reference = data.current?.dt;
   const interval = 15 * 60;
   const firstEnd = (Math.floor(reference / interval) + 1) * interval;
-  const finalEnd = firstEnd + 3 * interval;
-  // Open-Meteo timestamps label the end of each preceding 15-minute accumulation.
-  const values = (minutely.time || []).flatMap((time, index) => {
-    const end = typeof time === 'number' ? time : Date.parse(time) / 1000;
-    return end >= firstEnd && end <= finalEnd && (end - firstEnd) % interval === 0
-      ? [precip[index]]
-      : [];
-  });
-
-  if (precip.length === 0 || values.length === 0) {
+  if (precip.length === 0 || !minutely.time?.length || !Number.isFinite(firstEnd)) {
     console.log(chalk.yellow('📦 No minutely precipitation data available for this location.'));
     return;
   }
 
-  const maxIntervals = values.length;
+  // Open-Meteo timestamps label the end of each preceding 15-minute accumulation.
+  // Preserve gaps instead of shifting subsequent samples or plotting them as zero.
+  const byEndTime = new Map();
+  for (const [index, time] of minutely.time.entries()) {
+    byEndTime.set(typeof time === 'number' ? time : Date.parse(time) / 1000, precip[index]);
+  }
+  const maxIntervals = 4;
+  const values = Array.from({ length: maxIntervals }, (_, i) =>
+    byEndTime.get(firstEnd + i * interval)
+  );
+  const known = values.filter((value) => Number.isFinite(value) && value >= 0);
+  const missing = maxIntervals - known.length;
+  if (missing) {
+    const peak = Math.max(...known);
+    const summary = peak > 0 ? ` Peak among available intervals: ${peak.toFixed(1)} mm/15min.` : '';
+    console.log(
+      chalk.yellow(`Next-hour precipitation: ${missing} of 4 intervals unavailable.${summary}`)
+    );
+    return;
+  }
 
-  // If all values are zero or the array is too short, still show the chart
-  // but indicate no precipitation expected.
   const termWidth = process.stdout.columns || 80;
   const boxWidth = Math.min(termWidth - 2, 88);
   const innerWidth = boxWidth - 4; // boxen padding + borders
@@ -436,13 +444,7 @@ function displayMinutelyForecast(data, _displayUnit) {
   // Build a continuous braille bar chart.
   // We stretch the precipitation values across the inner width using the
   // braille chart renderer for a smooth line.
-  let chartLine;
-  if (values.length >= 2) {
-    chartLine = renderBrailleLineChart(values, { width: innerWidth, height: 2 });
-  } else {
-    // Single data point — show a simple bar representation
-    chartLine = values[0] > 0 ? '█'.repeat(innerWidth) : '─'.repeat(innerWidth);
-  }
+  const chartLine = renderBrailleLineChart(values, { width: innerWidth, height: 2 });
 
   // Determine colour based on peak precipitation
   const peakPrecip = Math.max(...values, 0);
@@ -457,16 +459,12 @@ function displayMinutelyForecast(data, _displayUnit) {
     if (i === 0) timeLabels.push('Now');
     else timeLabels.push(`${i * 15}m`);
   }
-  // Always add the endpoint label if we have intervals
-  if (maxIntervals >= 2) {
-    timeLabels.push(`${maxIntervals * 15}m`);
-  }
+  timeLabels.push(`${maxIntervals * 15}m`);
 
   // Place labels at positions proportional to the chart
   const labelPositions = timeLabels.map((label, i) => {
     // Spread labels across the chart width
-    const col =
-      maxIntervals <= 1 ? 0 : Math.round((i / (timeLabels.length - 1 || 1)) * (innerWidth - 1));
+    const col = Math.round((i / (timeLabels.length - 1)) * (innerWidth - 1));
     return { label, col };
   });
 

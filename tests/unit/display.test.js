@@ -308,6 +308,29 @@ describe('displayMinutelyForecast', () => {
     spy.mockRestore();
   });
 
+  it.each([
+    { values: [null, null, null, null], missing: 4 },
+    { values: [0, null, 0, 0], missing: 1 },
+    { values: [0], missing: 3 }
+  ])('never reports dry conditions with $missing missing interval(s)', ({ values, missing }) => {
+    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const current = Date.parse('2026-05-29T12:00:00Z') / 1000;
+    try {
+      displayMinutelyForecast({
+        current: { dt: current },
+        minutely: {
+          time: values.map((_, index) => current + (index + 1) * 900),
+          precipitation: values
+        }
+      });
+      const output = spy.mock.calls.flat().join('\n');
+      expect(output).toContain(`${missing} of 4 intervals unavailable`);
+      expect(output).not.toMatch(/No precipitation expected|No rain next hour/);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it('renders a chart when minutely precipitation data is present', () => {
     const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
     displayMinutelyForecast(
@@ -390,7 +413,8 @@ describe('displayMinutelyForecast', () => {
     );
     expect(spy).toHaveBeenCalled();
     const output = spy.mock.calls.map((args) => args.join('')).join('\n');
-    expect(output).toContain('Precipitation next hour');
+    expect(output).toContain('2 of 4 intervals unavailable');
+    expect(output).toContain('Peak');
     spy.mockRestore();
   });
 });
