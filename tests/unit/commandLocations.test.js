@@ -165,6 +165,34 @@ describe('CLI location dispatch', () => {
     expect(console.log).toHaveBeenCalledWith(expect.stringContaining(message));
   });
 
+  it('returns the comparison and both reports as a single JSON object', async () => {
+    await runCommand(['compare', 'San Ramon CA', 'London', '--json']);
+    expect(console.log).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(console.log.mock.calls[0][0])).toMatchObject({
+      first: weather,
+      second: weather,
+      comparison: { difference: 0, unit: 'celsius', warmer: null }
+    });
+  });
+
+  it('returns the historical report as JSON', async () => {
+    await runCommand(['history', 'San Ramon CA', '--date', '2023-07-15', '--json']);
+    expect(console.log).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(console.log.mock.calls[0][0])).toMatchObject({
+      place: { name: 'San Ramon' },
+      data: { date: '2023-07-15' }
+    });
+  });
+
+  it('represents unavailable marine data as JSON null', async () => {
+    await runCommand(['marine', 'San Ramon CA', '--json']);
+    expect(console.log).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(console.log.mock.calls[0][0])).toMatchObject({
+      place: { name: 'San Ramon' },
+      marine: null
+    });
+  });
+
   it('rejects ambiguous unquoted compare locations', async () => {
     await expect(runCommand(['compare', 'San', 'Ramon', 'New', 'York'])).rejects.toMatchObject({
       code: 'commander.excessArguments'

@@ -115,11 +115,10 @@ On supported weather commands, override the units with:
 
 Marine and historical weather currently use metric units.
 
-Current weather, forecast, coordinates, radar, watch, and marine commands support
-`--json`. Check a command's help before combining options. Cached commands may
-print a cache message before the JSON, so their stdout is not always valid JSON.
-Watch mode also prints a header and separator before each JSON report; its stdout
-is not a standalone JSON document.
+Current weather, forecasts, coordinates, radar, marine, history, compare, and
+status support `--json`. Each successful run writes a single JSON document to
+stdout, whether it fetches or uses the cache. `watch --json` streams one JSON
+document per line (NDJSON), without clearing the screen or printing banners.
 
 ```bash
 weather London --celsius
