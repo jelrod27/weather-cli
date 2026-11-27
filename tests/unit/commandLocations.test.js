@@ -152,6 +152,47 @@ describe('CLI location dispatch', () => {
     expect(getWeather).toHaveBeenNthCalledWith(2, 'New York NY', null);
   });
 
+  it.each([
+    [68, 20, 'Both cities have the same temperature!'],
+    [50, 20, 'London is warmer by 18.0°']
+  ])('compares %s°F and %s°C in the same unit', async (us, uk, message) => {
+    getWeather.mockResolvedValueOnce({
+      current: { main: { temp: us } },
+      displayUnit: 'fahrenheit'
+    });
+    getWeather.mockResolvedValueOnce({ current: { main: { temp: uk } }, displayUnit: 'celsius' });
+    await runCommand(['compare', 'San Ramon CA', 'London']);
+    expect(console.log).toHaveBeenCalledWith(expect.stringContaining(message));
+  });
+
+  it('returns the comparison and both reports as a single JSON object', async () => {
+    await runCommand(['compare', 'San Ramon CA', 'London', '--json']);
+    expect(console.log).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(console.log.mock.calls[0][0])).toMatchObject({
+      first: weather,
+      second: weather,
+      comparison: { difference: 0, unit: 'celsius', warmer: null }
+    });
+  });
+
+  it('returns the historical report as JSON', async () => {
+    await runCommand(['history', 'San Ramon CA', '--date', '2023-07-15', '--json']);
+    expect(console.log).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(console.log.mock.calls[0][0])).toMatchObject({
+      place: { name: 'San Ramon' },
+      data: { date: '2023-07-15' }
+    });
+  });
+
+  it('represents unavailable marine data as JSON null', async () => {
+    await runCommand(['marine', 'San Ramon CA', '--json']);
+    expect(console.log).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(console.log.mock.calls[0][0])).toMatchObject({
+      place: { name: 'San Ramon' },
+      marine: null
+    });
+  });
+
   it('rejects ambiguous unquoted compare locations', async () => {
     await expect(runCommand(['compare', 'San', 'Ramon', 'New', 'York'])).rejects.toMatchObject({
       code: 'commander.excessArguments'
@@ -159,10 +200,21 @@ describe('CLI location dispatch', () => {
     expect(getWeather).not.toHaveBeenCalled();
   });
 
+  it.each(['37.77junk,-122.42', '37.77,-122.42,8', '37.77,'])(
+    'rejects an invalid coordinate pair before reading the cache: %s',
+    async (coordinates) => {
+      await expect(runCommand(['coords', coordinates])).rejects.toMatchObject({
+        code: 'INVALID_INPUT'
+      });
+      expect(getCachedWeather).not.toHaveBeenCalled();
+      expect(getWeatherByCoords).not.toHaveBeenCalled();
+    }
+  );
+
   it('continues to dispatch coordinate pairs without location parsing', async () => {
     await runCommand(['coords', '37.77,-122.42']);
 
-    expect(getWeatherByCoords).toHaveBeenCalledWith('37.77', '-122.42', null);
+    expect(getWeatherByCoords).toHaveBeenCalledWith(37.77, -122.42, null);
     expect(getWeather).not.toHaveBeenCalled();
   });
 });

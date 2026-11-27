@@ -278,6 +278,14 @@ describe('processTemperatureOptions', () => {
     expect(processTemperatureOptions({ units: 'imperial' })).toBe('fahrenheit');
   });
 
+  it.each(['celsius', 'fahrenheit'])('honors the %s unit alias', (units) => {
+    expect(processTemperatureOptions({ units })).toBe(units);
+  });
+
+  it('rejects unsupported units instead of silently selecting Fahrenheit', () => {
+    expect(() => processTemperatureOptions({ units: 'nonsense' })).toThrow('Invalid units');
+  });
+
   it('returns null for units=auto (auto-detection)', () => {
     expect(processTemperatureOptions({ units: 'auto' })).toBeNull();
   });

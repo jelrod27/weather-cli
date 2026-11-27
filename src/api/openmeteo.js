@@ -58,6 +58,8 @@ export async function fetchForecast(lat, lon, { tempUnit, windUnit, includeMinut
 
   if (includeMinutely) {
     params.minutely_15 = 'precipitation';
+    // Include the current quarter-hour and the next four accumulation endpoints.
+    params.forecast_minutely_15 = 5;
   }
 
   const res = await httpClient.get(FORECAST_URL, { params });

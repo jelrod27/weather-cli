@@ -175,10 +175,17 @@ describe('watch command', () => {
       expect(displayCurrentWeather).toHaveBeenCalledWith(sampleData, 'celsius', expect.any(Object));
     });
 
-    it('prints raw JSON instead of the formatted display with --json', async () => {
-      await runWatch('London', '--json');
+    it('prints one JSON document per refresh with no banners or cache logs', async () => {
+      await runWatch('London', '--json', '--interval', '1');
+      getCachedWeather.mockResolvedValue(sampleData);
+      await vi.advanceTimersByTimeAsync(MINUTE);
       expect(displayCurrentWeather).not.toHaveBeenCalled();
-      expect(console.log).toHaveBeenCalledWith(JSON.stringify(sampleData, null, 2));
+      expect(console.clear).not.toHaveBeenCalled();
+      expect(console.log.mock.calls.map(([line]) => JSON.parse(line))).toEqual([
+        sampleData,
+        sampleData
+      ]);
+      expect(console.log.mock.calls.every(([line]) => !line.includes('\n'))).toBe(true);
     });
 
     it('installs a SIGINT handler that clears the screen and exits 0', async () => {

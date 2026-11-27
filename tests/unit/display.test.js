@@ -20,7 +20,9 @@ import {
   createDataRow,
   displayAlerts,
   displayMinutelyForecast,
-  displayCurrentWeather
+  displayCurrentWeather,
+  display5DayForecast,
+  display24HourForecast
 } from '../../src/display.js';
 
 describe('formatTemp', () => {
@@ -269,6 +271,27 @@ describe('degToCardinal', () => {
 });
 
 describe('displayMinutelyForecast', () => {
+  it('uses the next four intervals, not dry samples from earlier that day', () => {
+    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const current = Date.parse('2026-05-29T12:00:00Z') / 1000;
+    try {
+      displayMinutelyForecast({
+        current: { dt: current },
+        minutely: {
+          time: [-43200, -42300, -41400, -40500, 0, 900, 1800, 2700, 3600, 4500].map(
+            (offset) => current + offset
+          ),
+          precipitation: [0, 0, 0, 0, 5, 0, 2, 0, 0, 9]
+        }
+      });
+      const output = spy.mock.calls.flat().join('\n');
+      expect(output).toContain('Peak: 2.0 mm/15min');
+      expect(output).not.toContain('No rain next hour');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it('outputs a message when no minutely data is available', () => {
     const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
     displayMinutelyForecast({}, 'celsius');
@@ -287,12 +310,41 @@ describe('displayMinutelyForecast', () => {
     spy.mockRestore();
   });
 
+  it.each([
+    { values: [null, null, null, null], missing: 4 },
+    { values: [0, null, 0, 0], missing: 1 },
+    { values: [0], missing: 3 }
+  ])('never reports dry conditions with $missing missing interval(s)', ({ values, missing }) => {
+    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const current = Date.parse('2026-05-29T12:00:00Z') / 1000;
+    try {
+      displayMinutelyForecast({
+        current: { dt: current },
+        minutely: {
+          time: values.map((_, index) => current + (index + 1) * 900),
+          precipitation: values
+        }
+      });
+      const output = spy.mock.calls.flat().join('\n');
+      expect(output).toContain(`${missing} of 4 intervals unavailable`);
+      expect(output).not.toMatch(/No precipitation expected|No rain next hour/);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it('renders a chart when minutely precipitation data is present', () => {
     const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
     displayMinutelyForecast(
       {
+        current: { dt: Date.parse('2026-05-29T11:45:00Z') / 1000 },
         minutely: {
-          time: ['2026-05-29T12:00', '2026-05-29T12:15', '2026-05-29T12:30', '2026-05-29T12:45'],
+          time: [
+            '2026-05-29T12:00:00Z',
+            '2026-05-29T12:15:00Z',
+            '2026-05-29T12:30:00Z',
+            '2026-05-29T12:45:00Z'
+          ],
           precipitation: [0, 0.5, 1.2, 0.3]
         }
       },
@@ -311,8 +363,14 @@ describe('displayMinutelyForecast', () => {
     const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
     displayMinutelyForecast(
       {
+        current: { dt: Date.parse('2026-05-29T11:45:00Z') / 1000 },
         minutely: {
-          time: ['2026-05-29T12:00', '2026-05-29T12:15', '2026-05-29T12:30', '2026-05-29T12:45'],
+          time: [
+            '2026-05-29T12:00:00Z',
+            '2026-05-29T12:15:00Z',
+            '2026-05-29T12:30:00Z',
+            '2026-05-29T12:45:00Z'
+          ],
           precipitation: [0, 0, 0, 0]
         }
       },
@@ -329,8 +387,9 @@ describe('displayMinutelyForecast', () => {
     const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
     displayMinutelyForecast(
       {
+        current: { dt: Date.parse('2026-05-29T11:45:00Z') / 1000 },
         minutely: {
-          time: ['2026-05-29T12:00'],
+          time: ['2026-05-29T12:00:00Z'],
           precipitation: [2.5]
         }
       },
@@ -346,8 +405,9 @@ describe('displayMinutelyForecast', () => {
     const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
     displayMinutelyForecast(
       {
+        current: { dt: Date.parse('2026-05-29T11:45:00Z') / 1000 },
         minutely: {
-          time: ['2026-05-29T12:00', '2026-05-29T12:15'],
+          time: ['2026-05-29T12:00:00Z', '2026-05-29T12:15:00Z'],
           precipitation: [0.1, 1.0]
         }
       },
@@ -355,7 +415,8 @@ describe('displayMinutelyForecast', () => {
     );
     expect(spy).toHaveBeenCalled();
     const output = spy.mock.calls.map((args) => args.join('')).join('\n');
-    expect(output).toContain('Precipitation next hour');
+    expect(output).toContain('2 of 4 intervals unavailable');
+    expect(output).toContain('Peak');
     spy.mockRestore();
   });
 });
@@ -541,6 +602,45 @@ describe('formatDewPoint', () => {
 
   it('respects boundary: 23.9 is Severe not Oppressive', () => {
     expect(formatDewPoint(23.9, 'celsius')).toBe('24°C (Severe)');
+  });
+});
+
+describe('forecast location time zone', () => {
+  it('shows Tokyo sunrise, forecast hours and day boundaries in Tokyo time', () => {
+    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const unix = (iso) => Date.parse(iso) / 1000;
+    const weather = [{ id: 800, main: 'Clear', description: 'clear sky' }];
+    const data = {
+      timezone: 'Asia/Tokyo',
+      current: {
+        name: 'Tokyo',
+        sys: { sunrise: unix('2025-07-16T00:00Z'), sunset: unix('2025-07-16T10:00Z') },
+        main: { temp: 22 },
+        wind: { speed: 0, deg: 0 },
+        weather
+      },
+      forecast: {
+        list: [
+          { dt: unix('2025-07-16T14:00Z'), main: { temp: 20 }, weather },
+          { dt: unix('2025-07-16T17:00Z'), main: { temp: 18 }, weather }
+        ]
+      },
+      dailyAqi: { 'Thu Jul 17 2025': 1 }
+    };
+
+    try {
+      displayCurrentWeather(data, 'celsius');
+      display24HourForecast(data, 'celsius');
+      display5DayForecast(data, 'celsius');
+      const [current, hourly, daily] = spy.mock.calls.map(([output]) => output);
+      expect(current).toMatch(/Sunrise:\s+0?9:00 AM/);
+      expect(hourly).toContain('11p');
+      expect(hourly).toContain('2a');
+      expect(daily).toMatch(/Wed\s+20°C\/20°C/);
+      expect(daily).toMatch(/Thu\s+18°C\/18°C.*Good/);
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
 

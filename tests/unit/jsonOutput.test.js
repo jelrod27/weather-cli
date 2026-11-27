@@ -1,3 +1,8 @@
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, it, expect } from 'vitest';
 import { normalizeToOwmShape } from '../../src/api/openmeteo.js';
 
@@ -101,6 +106,36 @@ function buildData(displayUnit = 'fahrenheit', windUnit = 'mph') {
 }
 
 describe('--json output', () => {
+  it('emits only a single JSON document on cache hits in real CLI processes', () => {
+    const cwd = fileURLToPath(new URL('../../', import.meta.url));
+    const temp = mkdtempSync(join(tmpdir(), 'weather-json-'));
+    const env = { ...process.env, XDG_CACHE_HOME: temp, XDG_CONFIG_HOME: temp };
+    const run = (...args) =>
+      spawnSync(process.execPath, args, { cwd, env, encoding: 'utf8', timeout: 10_000 });
+    try {
+      const data = buildData();
+      const seed = run(
+        '--input-type=module',
+        '-e',
+        'import { setCachedWeather } from "./src/cache.js"; const data = JSON.parse(process.argv[1]); await setCachedWeather("San Ramon", "auto", data); await setCachedWeather("37.78,-121.97", "auto", data);',
+        JSON.stringify(data)
+      );
+      expect(seed.status, seed.stderr).toBe(0);
+      for (const [command, location] of [
+        ['now', 'San Ramon'],
+        ['forecast', 'San Ramon'],
+        ['5day', 'San Ramon'],
+        ['coords', '37.78,-121.97'],
+        ['status', 'San Ramon']
+      ]) {
+        const result = run('bin/weather.js', command, location, '--json');
+        expect(result.status, result.stderr).toBe(0);
+        expect(JSON.parse(result.stdout)).toMatchObject({ current: { name: 'San Ramon' } });
+      }
+    } finally {
+      rmSync(temp, { recursive: true, force: true });
+    }
+  }, 20_000);
   it('produces valid, parseable pretty-printed JSON', () => {
     const data = buildData();
     const serialized = JSON.stringify(data, null, 2);

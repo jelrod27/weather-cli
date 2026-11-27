@@ -90,7 +90,18 @@ function displayAlerts(alerts) {
   return parts.join('\n');
 }
 
+function forecastTimeZone(timeZone) {
+  try {
+    return timeZone
+      ? new Intl.DateTimeFormat('en-US', { timeZone }).resolvedOptions().timeZone
+      : 'UTC';
+  } catch {
+    return 'UTC';
+  }
+}
+
 function displayCurrentWeather(data, displayUnit, options = {}) {
+  const timeZone = forecastTimeZone(data.timezone);
   const windUnit = data.windUnit || (displayUnit === 'fahrenheit' ? 'mph' : 'ms');
   const weather = data.current || data;
 
@@ -166,8 +177,8 @@ function displayCurrentWeather(data, displayUnit, options = {}) {
   ];
 
   const right = [
-    `Sunrise:     ${formatTime(weather.sys.sunrise)} (${formatRelativeTime(weather.sys.sunrise)})`,
-    `Sunset:      ${formatTime(weather.sys.sunset)} (${formatRelativeTime(weather.sys.sunset)})`,
+    `Sunrise:     ${formatTime(weather.sys.sunrise, timeZone)} (${formatRelativeTime(weather.sys.sunrise)})`,
+    `Sunset:      ${formatTime(weather.sys.sunset, timeZone)} (${formatRelativeTime(weather.sys.sunset)})`,
     `Daylight:    ${formatDaylight(weather.sys.sunrise, weather.sys.sunset)}`,
     `Moon:        ${formatMoonPhase(getMoonPhase())}`,
     `Solar:      ${formatSolarRadiation(weather.solar_radiation)}`,
@@ -200,21 +211,27 @@ function displayCurrentWeather(data, displayUnit, options = {}) {
 
 function display5DayForecast(data, displayUnit) {
   const dailyData = {};
-  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  const today = new Date().getDay();
+  const dayFormat = new Intl.DateTimeFormat('en-US', {
+    timeZone: forecastTimeZone(data.timezone),
+    weekday: 'short',
+    month: 'short',
+    day: '2-digit',
+    year: 'numeric'
+  });
+  // Match the existing dailyAqi keys (e.g. "Thu Jul 17 2025"), but use the
+  // forecast location's calendar date rather than the terminal's.
+  const dayKey = (date) => dayFormat.format(date).replaceAll(',', '');
+  const today = dayKey(new Date());
 
   data.forecast.list.forEach((item) => {
-    const date = new Date(item.dt * 1000);
-    const dateKey = date.toDateString();
-    const dayIndex = date.getDay();
+    const dateKey = dayKey(new Date(item.dt * 1000));
 
     if (!dailyData[dateKey]) {
       dailyData[dateKey] = {
         temps: [],
         descriptions: [],
-        dayName: dayNames[dayIndex],
-        isToday: dayIndex === today,
-        date: date
+        dayName: dateKey.slice(0, 3),
+        isToday: dateKey === today
       };
     }
     dailyData[dateKey].temps.push(item.main.temp);
@@ -229,7 +246,7 @@ function display5DayForecast(data, displayUnit) {
   const forecastAqiByDay = {};
   data.forecast.list.forEach((item) => {
     if (item.aqi !== null && item.aqi !== undefined) {
-      const dateKey = new Date(item.dt * 1000).toDateString();
+      const dateKey = dayKey(new Date(item.dt * 1000));
       if (!forecastAqiByDay[dateKey]) forecastAqiByDay[dateKey] = [];
       forecastAqiByDay[dateKey].push(item.aqi);
     }
@@ -290,7 +307,8 @@ function display24HourForecast(data, displayUnit) {
   const boxWidth = Math.min(termWidth - 2, 88);
   const innerWidth = boxWidth - 4; // accounts for boxen padding (left+right=2) + borders (1+1)
 
-  const renderedSpark = renderSparklineBlock(next24Hours, displayUnit, innerWidth);
+  const timeZone = forecastTimeZone(data.timezone);
+  const renderedSpark = renderSparklineBlock(next24Hours, displayUnit, innerWidth, timeZone);
 
   // Build AQI summary line for the 24-hour period
   const aqiValues = next24Hours
@@ -304,7 +322,8 @@ function display24HourForecast(data, displayUnit) {
     aqiSummaryLine = `\nAir Quality: ${getAirQualityDescription(displayAqi)} (AQI: ${displayAqi})`;
   }
 
-  const content = (renderedSpark || renderForecastList(next24Hours, displayUnit)) + aqiSummaryLine;
+  const content =
+    (renderedSpark || renderForecastList(next24Hours, displayUnit, timeZone)) + aqiSummaryLine;
 
   console.log(
     boxen(content, {
@@ -319,13 +338,13 @@ function display24HourForecast(data, displayUnit) {
   );
 }
 
-function renderSparklineBlock(items, displayUnit, innerWidth) {
+function renderSparklineBlock(items, displayUnit, innerWidth, timeZone) {
   const temps = items.map((item) => item.main.temp);
   const emojis = items.map((item) => weatherEmojis[item.weather[0].main] || '🌤️');
   const times = items.map(
     (item) =>
       new Date(item.dt * 1000)
-        .toLocaleTimeString('en-US', { hour: 'numeric', hour12: true })
+        .toLocaleTimeString('en-US', { hour: 'numeric', hour12: true, timeZone })
         .replace(/\s/g, '')
         .toLowerCase()
         .replace(/m$/, '') // "12pm" → "12p", "9am" → "9a"
@@ -381,12 +400,13 @@ function renderSparklineBlock(items, displayUnit, innerWidth) {
   return [...chartRows, emojiRow, timeRow].join('\n');
 }
 
-function renderForecastList(items, displayUnit) {
+function renderForecastList(items, displayUnit, timeZone) {
   return items
     .map((item) => {
       const time = new Date(item.dt * 1000).toLocaleTimeString('en-US', {
         hour: 'numeric',
-        hour12: true
+        hour12: true,
+        timeZone
       });
       const emoji = weatherEmojis[item.weather[0].main] || '🌤️';
       const temp = formatTemp(item.main.temp, displayUnit);
@@ -408,19 +428,35 @@ function renderForecastList(items, displayUnit) {
 function displayMinutelyForecast(data, _displayUnit) {
   const minutely = data.minutely || {};
   const precip = minutely.precipitation || [];
-
-  if (precip.length === 0) {
+  const reference = data.current?.dt;
+  const interval = 15 * 60;
+  const firstEnd = (Math.floor(reference / interval) + 1) * interval;
+  if (precip.length === 0 || !minutely.time?.length || !Number.isFinite(firstEnd)) {
     console.log(chalk.yellow('📦 No minutely precipitation data available for this location.'));
     return;
   }
 
-  // Show up to 4 intervals (60 minutes). The API may return more; we take
-  // the first 4 which correspond to the next hour.
-  const maxIntervals = Math.min(precip.length, 4);
-  const values = precip.slice(0, maxIntervals);
+  // Open-Meteo timestamps label the end of each preceding 15-minute accumulation.
+  // Preserve gaps instead of shifting subsequent samples or plotting them as zero.
+  const byEndTime = new Map();
+  for (const [index, time] of minutely.time.entries()) {
+    byEndTime.set(typeof time === 'number' ? time : Date.parse(time) / 1000, precip[index]);
+  }
+  const maxIntervals = 4;
+  const values = Array.from({ length: maxIntervals }, (_, i) =>
+    byEndTime.get(firstEnd + i * interval)
+  );
+  const known = values.filter((value) => Number.isFinite(value) && value >= 0);
+  const missing = maxIntervals - known.length;
+  if (missing) {
+    const peak = Math.max(...known);
+    const summary = peak > 0 ? ` Peak among available intervals: ${peak.toFixed(1)} mm/15min.` : '';
+    console.log(
+      chalk.yellow(`Next-hour precipitation: ${missing} of 4 intervals unavailable.${summary}`)
+    );
+    return;
+  }
 
-  // If all values are zero or the array is too short, still show the chart
-  // but indicate no precipitation expected.
   const termWidth = process.stdout.columns || 80;
   const boxWidth = Math.min(termWidth - 2, 88);
   const innerWidth = boxWidth - 4; // boxen padding + borders
@@ -428,13 +464,7 @@ function displayMinutelyForecast(data, _displayUnit) {
   // Build a continuous braille bar chart.
   // We stretch the precipitation values across the inner width using the
   // braille chart renderer for a smooth line.
-  let chartLine;
-  if (values.length >= 2) {
-    chartLine = renderBrailleLineChart(values, { width: innerWidth, height: 2 });
-  } else {
-    // Single data point — show a simple bar representation
-    chartLine = values[0] > 0 ? '█'.repeat(innerWidth) : '─'.repeat(innerWidth);
-  }
+  const chartLine = renderBrailleLineChart(values, { width: innerWidth, height: 2 });
 
   // Determine colour based on peak precipitation
   const peakPrecip = Math.max(...values, 0);
@@ -449,16 +479,12 @@ function displayMinutelyForecast(data, _displayUnit) {
     if (i === 0) timeLabels.push('Now');
     else timeLabels.push(`${i * 15}m`);
   }
-  // Always add the endpoint label if we have intervals
-  if (maxIntervals >= 2) {
-    timeLabels.push(`${maxIntervals * 15}m`);
-  }
+  timeLabels.push(`${maxIntervals * 15}m`);
 
   // Place labels at positions proportional to the chart
   const labelPositions = timeLabels.map((label, i) => {
     // Spread labels across the chart width
-    const col =
-      maxIntervals <= 1 ? 0 : Math.round((i / (timeLabels.length - 1 || 1)) * (innerWidth - 1));
+    const col = Math.round((i / (timeLabels.length - 1)) * (innerWidth - 1));
     return { label, col };
   });
 

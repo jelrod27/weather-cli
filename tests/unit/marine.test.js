@@ -10,7 +10,7 @@ vi.mock('../../src/api/http.js', () => ({
 import httpClient from '../../src/api/http.js';
 import { fetchMarine, displayMarine, degToCardinal } from '../../src/api/marine.js';
 
-function marineResponse(overrides = {}) {
+function marineResponse(overrides = {}, unit = 'm/s') {
   const current = {
     wave_height: 1.8,
     wave_direction: 220,
@@ -22,6 +22,7 @@ function marineResponse(overrides = {}) {
   return {
     data: {
       current,
+      current_units: { ocean_current_velocity: unit },
       timezone: 'America/Los_Angeles',
       utc_offset_seconds: -25200
     }
@@ -102,9 +103,25 @@ describe('fetchMarine', () => {
       wavePeriod: 6.5,
       seaSurfaceTemp: 18.3,
       oceanCurrentVelocity: 0.42,
+      oceanCurrentVelocityUnit: 'm/s',
       timezone: 'America/Los_Angeles',
       utc_offset_seconds: -25200
     });
+  });
+
+  it.each(['km/h', undefined])('normalizes current velocity to m/s (%s metadata)', async (unit) => {
+    const fixture = marineResponse({ ocean_current_velocity: 3.6 }, unit);
+    if (unit === undefined) delete fixture.data.current_units;
+    httpClient.get.mockResolvedValueOnce(fixture);
+    const marine = await fetchMarine(37.77, -122.42);
+    expect(marine.oceanCurrentVelocity).toBe(1);
+    expect(marine.oceanCurrentVelocityUnit).toBe('m/s');
+    expect(displayMarine(marine, { name: 'Coast', country: 'US' })).toContain('1 m/s');
+  });
+
+  it('does not guess a velocity for an unsupported source unit', async () => {
+    httpClient.get.mockResolvedValueOnce(marineResponse({ ocean_current_velocity: 42 }, '?'));
+    expect((await fetchMarine(37.77, -122.42)).oceanCurrentVelocity).toBeNull();
   });
 
   it('rounds wave direction to the nearest integer degree', async () => {

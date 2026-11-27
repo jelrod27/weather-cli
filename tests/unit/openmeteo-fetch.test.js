@@ -32,6 +32,18 @@ describe('fetchForecast request contract', () => {
     );
   });
 
+  it('anchors the radar series to the current quarter-hour', async () => {
+    await fetchForecast(51.5, -0.12, {
+      tempUnit: 'celsius',
+      windUnit: 'ms',
+      includeMinutely: true
+    });
+    expect(get.mock.calls[0][1].params).toMatchObject({
+      minutely_15: 'precipitation',
+      forecast_minutely_15: 5
+    });
+  });
+
   it('requests the supported daily maximum precipitation probability', async () => {
     await fetchForecast(51.5, -0.12, { tempUnit: 'celsius', windUnit: 'ms' });
 

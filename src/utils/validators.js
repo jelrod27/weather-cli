@@ -61,11 +61,27 @@ export function validateLocation(location) {
   return sanitized;
 }
 
-export function validateCoordinates(lat, lon) {
-  const latitude = parseFloat(lat);
-  const longitude = parseFloat(lon);
+const DECIMAL_COORDINATE = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/;
 
-  if (isNaN(latitude) || isNaN(longitude)) {
+function parseCoordinate(value) {
+  if (typeof value === 'number') return value;
+  const raw = typeof value === 'string' ? value.trim() : '';
+  return DECIMAL_COORDINATE.test(raw) ? Number(raw) : NaN;
+}
+
+export function parseCoordinatePair(value) {
+  const parts = value.split(',');
+  if (parts.length !== 2) {
+    throw new WeatherError('Expected exactly two coordinates: lat,lon', ERROR_CODES.INVALID_INPUT);
+  }
+  return validateCoordinates(...parts);
+}
+
+export function validateCoordinates(lat, lon) {
+  const latitude = parseCoordinate(lat);
+  const longitude = parseCoordinate(lon);
+
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
     throw new WeatherError(
       'Invalid coordinates. Both latitude and longitude must be numbers',
       ERROR_CODES.INVALID_INPUT

@@ -39,11 +39,12 @@ function formatFeelsLike(temp, displayUnit) {
   return `${c}°C / ${f}°F`;
 }
 
-function formatTime(timestamp) {
+function formatTime(timestamp, timeZone) {
   return new Date(timestamp * 1000).toLocaleTimeString('en-US', {
     hour: '2-digit',
     minute: '2-digit',
-    hour12: true
+    hour12: true,
+    timeZone
   });
 }
 

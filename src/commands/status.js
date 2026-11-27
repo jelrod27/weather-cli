@@ -29,7 +29,8 @@ export async function runStatus(
     await setCachedWeather(location, cacheKey, data);
   }
 
-  process.stdout.write(formatStatus(data, options) + '\n');
+  const output = options.json ? JSON.stringify(data, null, 2) : formatStatus(data, options);
+  process.stdout.write(output + '\n');
 }
 
 export function formatStatus(data, options = {}) {

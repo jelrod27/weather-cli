@@ -27,6 +27,19 @@ function fmt(value, digits = 1) {
   return Number(value.toFixed(digits));
 }
 
+// The marine API defaults to km/h when no alternate velocity unit is requested.
+function currentVelocityInMetersPerSecond(value, unit = 'km/h') {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+  switch (unit) {
+    case 'km/h':
+      return fmt(value / 3.6, 2);
+    case 'm/s':
+      return fmt(value, 2);
+    default:
+      return null;
+  }
+}
+
 /**
  * Fetch marine/ocean data from the Open-Meteo Marine API.
  * @param {number} lat - Latitude
@@ -59,7 +72,10 @@ export async function fetchMarine(lat, lon) {
       : null;
   const wavePeriod = fmt(current.wave_period, 1);
   const seaSurfaceTemp = fmt(current.sea_surface_temperature, 1);
-  const oceanCurrentVelocity = fmt(current.ocean_current_velocity, 2);
+  const oceanCurrentVelocity = currentVelocityInMetersPerSecond(
+    current.ocean_current_velocity,
+    data?.current_units?.ocean_current_velocity
+  );
 
   // Determine if the location has no marine data (e.g. inland location).
   const noCurrentData =
@@ -80,6 +96,7 @@ export async function fetchMarine(lat, lon) {
     wavePeriod,
     seaSurfaceTemp,
     oceanCurrentVelocity,
+    oceanCurrentVelocityUnit: 'm/s',
     timezone: data?.timezone || null,
     utc_offset_seconds: data?.utc_offset_seconds ?? null
   };

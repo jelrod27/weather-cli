@@ -27,7 +27,8 @@ import {
 } from '../config.js';
 import { WeatherError, mapErrorToExitCode } from '../utils/errors.js';
 import { parseLocation } from '../utils/locationParser.js';
-import { parseWatchInterval } from '../utils/validators.js';
+import { convertTemperature } from '../units.js';
+import { parseCoordinatePair, parseWatchInterval } from '../utils/validators.js';
 import { runStatus } from './status.js';
 import { geocode } from '../api/openmeteo.js';
 import { fetchHistorical, isValidDate } from '../api/historical.js';
@@ -79,15 +80,15 @@ async function resolveLocation(locationWords) {
   const defaultLocation = await getDefaultLocation();
   if (defaultLocation) return defaultLocation;
   console.error(chalk.red('❌ No location provided and no default set'));
-  console.log(chalk.yellow('Examples: weather CA, weather San Ramon CA, weather London'));
+  console.error(chalk.yellow('Examples: weather CA, weather San Ramon CA, weather London'));
   throw new WeatherError('No location provided', 'INVALID_INPUT');
 }
 
-async function fetchWithCache(location, userUnits, { fetcher = getWeather } = {}) {
+async function fetchWithCache(location, userUnits, { fetcher = getWeather, quiet = false } = {}) {
   const cacheKey = userUnits || 'auto';
   const cached = await getCachedWeather(location, cacheKey);
   if (cached) {
-    console.log(chalk.gray('📦 Using cached data...'));
+    if (!quiet) console.log(chalk.gray('📦 Using cached data...'));
     return cached;
   }
   const data = await fetcher(location, userUnits);
@@ -102,7 +103,7 @@ async function fetchWithCache(location, userUnits, { fetcher = getWeather } = {}
 async function runCurrentCommand(location, options, { forecast = false } = {}) {
   const userUnits = processTemperatureOptions(options);
   const artOpts = await buildArtOptions(options);
-  const data = await fetchWithCache(location, userUnits);
+  const data = await fetchWithCache(location, userUnits, { quiet: options.json });
   if (options.json) {
     console.log(JSON.stringify(data, null, 2));
     return data;
@@ -150,7 +151,7 @@ function handleError(error) {
   if (error instanceof WeatherError) {
     console.error(chalk.red(`❌ ${error.message}`));
     if (error.code === 'LOCATION_NOT_FOUND') {
-      console.log(chalk.yellow('Examples: "San Ramon, CA" or "London, UK"'));
+      console.error(chalk.yellow('Examples: "San Ramon, CA" or "London, UK"'));
     }
   } else {
     console.error(chalk.red(`❌ Unexpected error: ${error.message}`));
@@ -160,28 +161,50 @@ function handleError(error) {
 
 async function compareWeather(city1, city2, options) {
   const userUnits = processTemperatureOptions(options);
-  console.log(chalk.cyan.bold(`\n🌍 Comparing weather: ${city1} vs ${city2}`));
+  if (!options.json) console.log(chalk.cyan.bold(`\n🌍 Comparing weather: ${city1} vs ${city2}`));
 
   const [data1, data2] = await Promise.all([
-    fetchWithCache(city1, userUnits),
-    fetchWithCache(city2, userUnits)
+    fetchWithCache(city1, userUnits, { quiet: options.json }),
+    fetchWithCache(city2, userUnits, { quiet: options.json })
   ]);
+
+  const temp1 = data1.current.main.temp;
+  const temp2 = data2.current.main.temp;
+  // Compare in City 1's display unit, at the precision used in the summary.
+  const unit = data1.displayUnit;
+  const delta =
+    Number.isFinite(temp1) && Number.isFinite(temp2)
+      ? temp1 - convertTemperature(temp2, data2.displayUnit, unit)
+      : null;
+  const difference = delta === null ? null : Number(Math.abs(delta).toFixed(1));
+  const warmer = difference ? (delta > 0 ? city1 : city2) : null;
+
+  if (options.json) {
+    console.log(
+      JSON.stringify(
+        { first: data1, second: data2, comparison: { difference, unit, warmer } },
+        null,
+        2
+      )
+    );
+    return;
+  }
 
   console.log(chalk.green('\n📍 City 1:'));
   displayCurrentWeather(data1, data1.displayUnit);
   console.log(chalk.green('\n📍 City 2:'));
   displayCurrentWeather(data2, data2.displayUnit);
 
-  const temp1 = data1.current.main.temp;
-  const temp2 = data2.current.main.temp;
-  const diff = Math.abs(temp1 - temp2);
-  const unit = data1.displayUnit === 'fahrenheit' ? 'F' : 'C';
+  if (difference === null) {
+    console.log(chalk.yellow('Temperature difference unavailable.'));
+    return;
+  }
 
-  console.log(chalk.yellow(`\n🌡️  Temperature difference: ${diff.toFixed(1)}°${unit}`));
-  if (temp1 > temp2) {
-    console.log(chalk.red(`${city1} is warmer by ${diff.toFixed(1)}°`));
-  } else if (temp2 > temp1) {
-    console.log(chalk.red(`${city2} is warmer by ${diff.toFixed(1)}°`));
+  const formatted = difference.toFixed(1);
+  const unitSuffix = unit === 'fahrenheit' ? 'F' : 'C';
+  console.log(chalk.yellow(`\n🌡️  Temperature difference: ${formatted}°${unitSuffix}`));
+  if (warmer) {
+    console.log(chalk.red(`${warmer} is warmer by ${formatted}°`));
   } else {
     console.log(chalk.green('Both cities have the same temperature!'));
   }
@@ -270,7 +293,7 @@ function registerAll(program) {
     const location = parseLocation(locationWords);
     if (!location) {
       console.error(chalk.red('❌ Please specify a location'));
-      console.log(chalk.yellow('Examples: weather CA, weather San Ramon CA, weather London'));
+      console.error(chalk.yellow('Examples: weather CA, weather San Ramon CA, weather London'));
       process.exit(1);
     }
     await runCurrentCommand(location, options, { forecast: options.forecast });
@@ -311,7 +334,7 @@ function registerAll(program) {
     const loc = await resolveLocation(locationWords);
     const userUnits = processTemperatureOptions(options);
     const artOpts = await buildArtOptions(options);
-    const data = await fetchWithCache(loc, userUnits);
+    const data = await fetchWithCache(loc, userUnits, { quiet: options.json });
     if (options.json) {
       console.log(JSON.stringify(data, null, 2));
       return;
@@ -337,7 +360,7 @@ function registerAll(program) {
     const loc = await resolveLocation(locationWords);
     const userUnits = processTemperatureOptions(options);
     const artOpts = await buildArtOptions(options);
-    const data = await fetchWithCache(loc, userUnits);
+    const data = await fetchWithCache(loc, userUnits, { quiet: options.json });
     if (options.json) {
       console.log(JSON.stringify(data, null, 2));
       return;
@@ -361,11 +384,12 @@ function registerAll(program) {
         .description('Get weather by GPS coordinates (format: lat,lon)')
     )
   ).action(async (coordinates, options) => {
-    const [lat, lon] = coordinates.split(',').map((c) => c.trim());
+    const { latitude: lat, longitude: lon } = parseCoordinatePair(coordinates);
     const userUnits = processTemperatureOptions(options);
     const artOpts = await buildArtOptions(options);
     const data = await fetchWithCache(`${lat},${lon}`, userUnits, {
-      fetcher: (_loc, units) => getWeatherByCoords(lat, lon, units)
+      fetcher: (_loc, units) => getWeatherByCoords(lat, lon, units),
+      quiet: options.json
     });
     if (options.json) {
       console.log(JSON.stringify(data, null, 2));
@@ -497,7 +521,11 @@ function registerAll(program) {
     async function render() {
       const userUnits = processTemperatureOptions(options);
       const artOpts = await buildArtOptions(options);
-      const data = await fetchWithCache(loc, userUnits);
+      const data = await fetchWithCache(loc, userUnits, { quiet: options.json });
+      if (options.json) {
+        console.log(JSON.stringify(data));
+        return;
+      }
 
       const remainingMs = Math.max(0, nextRefreshAt - Date.now());
       const remainingSec = Math.round(remainingMs / 1000);
@@ -512,10 +540,6 @@ function registerAll(program) {
         )
       );
       console.log(chalk.gray('─'.repeat(Math.min(60, process.stdout.columns || 60))));
-      if (options.json) {
-        console.log(JSON.stringify(data, null, 2));
-        return;
-      }
       displayCurrentWeather(data, data.displayUnit, artOpts);
     }
 
@@ -524,8 +548,10 @@ function registerAll(program) {
     }
 
     process.on('SIGINT', () => {
-      console.clear();
-      console.log(chalk.gray('Watch stopped.'));
+      if (!options.json) {
+        console.clear();
+        console.log(chalk.gray('Watch stopped.'));
+      }
       process.exit(0);
     });
 
@@ -553,13 +579,13 @@ function registerAll(program) {
     const place = await geocode(loc);
     const marine = await fetchMarine(place.lat, place.lon);
 
-    if (!marine) {
-      console.log(chalk.yellow('No marine data available for this location (may be inland).'));
+    if (options.json) {
+      console.log(JSON.stringify({ place, marine }, null, 2));
       return;
     }
 
-    if (options.json) {
-      console.log(JSON.stringify({ place, marine }, null, 2));
+    if (!marine) {
+      console.log(chalk.yellow('No marine data available for this location (may be inland).'));
       return;
     }
 
@@ -571,10 +597,11 @@ function registerAll(program) {
     .command('history [location...]')
     .description('Show historical weather for a given date (Open-Meteo Archive API)')
     .option('-d, --date <YYYY-MM-DD>', 'Date to fetch (required, format YYYY-MM-DD)')
+    .option('--json', 'Output raw JSON weather data instead of formatted terminal output')
     .action(async (locationWords, options) => {
       if (!options.date) {
         console.error(chalk.red('❌ --date <YYYY-MM-DD> is required for the history command'));
-        console.log(chalk.yellow('Example: weather history --date 2023-07-15 "San Ramon, CA"'));
+        console.error(chalk.yellow('Example: weather history --date 2023-07-15 "San Ramon, CA"'));
         process.exit(6);
       }
       if (!isValidDate(options.date)) {
@@ -583,7 +610,7 @@ function registerAll(program) {
             `❌ Invalid date "${options.date}". Expected format: YYYY-MM-DD (e.g. 2023-07-15).`
           )
         );
-        console.log(
+        console.error(
           chalk.yellow(
             'Note: the date must be a real calendar day in the past covered by the archive.'
           )

@@ -171,6 +171,14 @@ describe('validateCoordinates', () => {
     expect(() => validateCoordinates('abc', 'def')).toThrow('must be numbers');
   });
 
+  it.each(['37.77junk', '', '0x25', 'Infinity'])('rejects a malformed token: %s', (latitude) => {
+    expect(() => validateCoordinates(latitude, 0)).toThrow('must be numbers');
+  });
+
+  it('accepts signed decimals and zero', () => {
+    expect(validateCoordinates('+.25', '0')).toEqual({ latitude: 0.25, longitude: 0 });
+  });
+
   it('accepts boundary values', () => {
     expect(validateCoordinates(90, 180)).toEqual({ latitude: 90, longitude: 180 });
     expect(validateCoordinates(-90, -180)).toEqual({ latitude: -90, longitude: -180 });
