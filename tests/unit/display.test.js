@@ -20,7 +20,9 @@ import {
   createDataRow,
   displayAlerts,
   displayMinutelyForecast,
-  displayCurrentWeather
+  displayCurrentWeather,
+  display5DayForecast,
+  display24HourForecast
 } from '../../src/display.js';
 
 describe('formatTemp', () => {
@@ -600,6 +602,45 @@ describe('formatDewPoint', () => {
 
   it('respects boundary: 23.9 is Severe not Oppressive', () => {
     expect(formatDewPoint(23.9, 'celsius')).toBe('24°C (Severe)');
+  });
+});
+
+describe('forecast location time zone', () => {
+  it('shows Tokyo sunrise, forecast hours and day boundaries in Tokyo time', () => {
+    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const unix = (iso) => Date.parse(iso) / 1000;
+    const weather = [{ id: 800, main: 'Clear', description: 'clear sky' }];
+    const data = {
+      timezone: 'Asia/Tokyo',
+      current: {
+        name: 'Tokyo',
+        sys: { sunrise: unix('2025-07-16T00:00Z'), sunset: unix('2025-07-16T10:00Z') },
+        main: { temp: 22 },
+        wind: { speed: 0, deg: 0 },
+        weather
+      },
+      forecast: {
+        list: [
+          { dt: unix('2025-07-16T14:00Z'), main: { temp: 20 }, weather },
+          { dt: unix('2025-07-16T17:00Z'), main: { temp: 18 }, weather }
+        ]
+      },
+      dailyAqi: { 'Thu Jul 17 2025': 1 }
+    };
+
+    try {
+      displayCurrentWeather(data, 'celsius');
+      display24HourForecast(data, 'celsius');
+      display5DayForecast(data, 'celsius');
+      const [current, hourly, daily] = spy.mock.calls.map(([output]) => output);
+      expect(current).toMatch(/Sunrise:\s+0?9:00 AM/);
+      expect(hourly).toContain('11p');
+      expect(hourly).toContain('2a');
+      expect(daily).toMatch(/Wed\s+20°C\/20°C/);
+      expect(daily).toMatch(/Thu\s+18°C\/18°C.*Good/);
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
 

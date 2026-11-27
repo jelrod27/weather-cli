@@ -90,7 +90,18 @@ function displayAlerts(alerts) {
   return parts.join('\n');
 }
 
+function forecastTimeZone(timeZone) {
+  try {
+    return timeZone
+      ? new Intl.DateTimeFormat('en-US', { timeZone }).resolvedOptions().timeZone
+      : 'UTC';
+  } catch {
+    return 'UTC';
+  }
+}
+
 function displayCurrentWeather(data, displayUnit, options = {}) {
+  const timeZone = forecastTimeZone(data.timezone);
   const windUnit = data.windUnit || (displayUnit === 'fahrenheit' ? 'mph' : 'ms');
   const weather = data.current || data;
 
@@ -166,8 +177,8 @@ function displayCurrentWeather(data, displayUnit, options = {}) {
   ];
 
   const right = [
-    `Sunrise:     ${formatTime(weather.sys.sunrise)} (${formatRelativeTime(weather.sys.sunrise)})`,
-    `Sunset:      ${formatTime(weather.sys.sunset)} (${formatRelativeTime(weather.sys.sunset)})`,
+    `Sunrise:     ${formatTime(weather.sys.sunrise, timeZone)} (${formatRelativeTime(weather.sys.sunrise)})`,
+    `Sunset:      ${formatTime(weather.sys.sunset, timeZone)} (${formatRelativeTime(weather.sys.sunset)})`,
     `Daylight:    ${formatDaylight(weather.sys.sunrise, weather.sys.sunset)}`,
     `Moon:        ${formatMoonPhase(getMoonPhase())}`,
     `Solar:      ${formatSolarRadiation(weather.solar_radiation)}`,
@@ -200,21 +211,27 @@ function displayCurrentWeather(data, displayUnit, options = {}) {
 
 function display5DayForecast(data, displayUnit) {
   const dailyData = {};
-  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  const today = new Date().getDay();
+  const dayFormat = new Intl.DateTimeFormat('en-US', {
+    timeZone: forecastTimeZone(data.timezone),
+    weekday: 'short',
+    month: 'short',
+    day: '2-digit',
+    year: 'numeric'
+  });
+  // Match the existing dailyAqi keys (e.g. "Thu Jul 17 2025"), but use the
+  // forecast location's calendar date rather than the terminal's.
+  const dayKey = (date) => dayFormat.format(date).replaceAll(',', '');
+  const today = dayKey(new Date());
 
   data.forecast.list.forEach((item) => {
-    const date = new Date(item.dt * 1000);
-    const dateKey = date.toDateString();
-    const dayIndex = date.getDay();
+    const dateKey = dayKey(new Date(item.dt * 1000));
 
     if (!dailyData[dateKey]) {
       dailyData[dateKey] = {
         temps: [],
         descriptions: [],
-        dayName: dayNames[dayIndex],
-        isToday: dayIndex === today,
-        date: date
+        dayName: dateKey.slice(0, 3),
+        isToday: dateKey === today
       };
     }
     dailyData[dateKey].temps.push(item.main.temp);
@@ -229,7 +246,7 @@ function display5DayForecast(data, displayUnit) {
   const forecastAqiByDay = {};
   data.forecast.list.forEach((item) => {
     if (item.aqi !== null && item.aqi !== undefined) {
-      const dateKey = new Date(item.dt * 1000).toDateString();
+      const dateKey = dayKey(new Date(item.dt * 1000));
       if (!forecastAqiByDay[dateKey]) forecastAqiByDay[dateKey] = [];
       forecastAqiByDay[dateKey].push(item.aqi);
     }
@@ -290,7 +307,8 @@ function display24HourForecast(data, displayUnit) {
   const boxWidth = Math.min(termWidth - 2, 88);
   const innerWidth = boxWidth - 4; // accounts for boxen padding (left+right=2) + borders (1+1)
 
-  const renderedSpark = renderSparklineBlock(next24Hours, displayUnit, innerWidth);
+  const timeZone = forecastTimeZone(data.timezone);
+  const renderedSpark = renderSparklineBlock(next24Hours, displayUnit, innerWidth, timeZone);
 
   // Build AQI summary line for the 24-hour period
   const aqiValues = next24Hours
@@ -304,7 +322,8 @@ function display24HourForecast(data, displayUnit) {
     aqiSummaryLine = `\nAir Quality: ${getAirQualityDescription(displayAqi)} (AQI: ${displayAqi})`;
   }
 
-  const content = (renderedSpark || renderForecastList(next24Hours, displayUnit)) + aqiSummaryLine;
+  const content =
+    (renderedSpark || renderForecastList(next24Hours, displayUnit, timeZone)) + aqiSummaryLine;
 
   console.log(
     boxen(content, {
@@ -319,13 +338,13 @@ function display24HourForecast(data, displayUnit) {
   );
 }
 
-function renderSparklineBlock(items, displayUnit, innerWidth) {
+function renderSparklineBlock(items, displayUnit, innerWidth, timeZone) {
   const temps = items.map((item) => item.main.temp);
   const emojis = items.map((item) => weatherEmojis[item.weather[0].main] || '🌤️');
   const times = items.map(
     (item) =>
       new Date(item.dt * 1000)
-        .toLocaleTimeString('en-US', { hour: 'numeric', hour12: true })
+        .toLocaleTimeString('en-US', { hour: 'numeric', hour12: true, timeZone })
         .replace(/\s/g, '')
         .toLowerCase()
         .replace(/m$/, '') // "12pm" → "12p", "9am" → "9a"
@@ -381,12 +400,13 @@ function renderSparklineBlock(items, displayUnit, innerWidth) {
   return [...chartRows, emojiRow, timeRow].join('\n');
 }
 
-function renderForecastList(items, displayUnit) {
+function renderForecastList(items, displayUnit, timeZone) {
   return items
     .map((item) => {
       const time = new Date(item.dt * 1000).toLocaleTimeString('en-US', {
         hour: 'numeric',
-        hour12: true
+        hour12: true,
+        timeZone
       });
       const emoji = weatherEmojis[item.weather[0].main] || '🌤️';
       const temp = formatTemp(item.main.temp, displayUnit);
